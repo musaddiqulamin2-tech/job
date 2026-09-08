@@ -358,6 +358,7 @@ export default function Home() {
           </p>
           <div className="jh-cta-btns">
             <Link href="#jobs" className="jh-btn jh-btn-primary">Browse Jobs</Link>
+            <Link href="/register" className="jh-btn jh-btn-register">Register Now</Link>
             <Link href="#about" className="jh-btn jh-btn-outline">Learn More</Link>
           </div>
         </div>

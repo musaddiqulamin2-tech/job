@@ -24,8 +24,10 @@ export default function Header() {
         <nav className={`jh-nav-links ${menuOpen ? "open" : ""}`}>
           <a href="/" onClick={() => setMenuOpen(false)}>Home</a>
           <a href="#jobs" onClick={() => setMenuOpen(false)}>Jobs</a>
-          <a href="#about" onClick={() => setMenuOpen(false)}>Categories</a>
-          <a href="#about" onClick={() => setMenuOpen(false)}>About</a>
+          <a href="#categories" onClick={() => setMenuOpen(false)}>Categories</a>
+          <a href="/register" className="jh-nav-register" onClick={() => setMenuOpen(false)}>
+            Register
+          </a>
           <a href="/admin" className="jh-nav-admin" onClick={() => setMenuOpen(false)}>
             Admin Panel
           </a>
