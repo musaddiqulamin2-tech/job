@@ -29,15 +29,14 @@ export default function Footer() {
 
           <div>
             <h3>For Job Seekers</h3>
-            <a href="#jobs">Browse Jobs</a>
-            <a href="#jobs">Apply for Jobs</a>
-            <a href="#about">Career Advice</a>
+            <a href="/#jobs">Browse Jobs</a>
+            <a href="/#jobs">Apply for Jobs</a>
             <a href="#">Resume Builder</a>
           </div>
 
           <div>
             <h3>For Employers</h3>
-            <a href="#">Post a Job</a>
+            <a href="/offer-job">Post a Job</a>
             <a href="#">Browse Candidates</a>
             <a href="#">Pricing</a>
             <a href="#">Employer Dashboard</a>
@@ -45,10 +44,10 @@ export default function Footer() {
 
           <div>
             <h3>Company</h3>
-            <a href="#about">About Us</a>
-            <a href="#">Contact</a>
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Service</a>
+            <a href="/#jobs">About Us</a>
+            <a href="/contact">Contact</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
           </div>
         </div>
 

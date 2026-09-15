@@ -2,21 +2,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const categories = [
-  { name: "Technology", icon: "💻" },
-  { name: "Design", icon: "🎨" },
-  { name: "Marketing", icon: "📢" },
-  { name: "Finance", icon: "📊" },
-  { name: "Healthcare", icon: "🏥" },
-  { name: "Education", icon: "📚" },
-  { name: "Sales", icon: "💼" },
-  { name: "Remote Jobs", icon: "🌍" },
-];
-
-const marqueeItems = [
-  "Technology", "Design", "Marketing", "Finance", "Healthcare",
-  "Education", "Sales", "Remote Jobs", "Engineering", "Data Science",
-  "Product", "Operations", "HR", "Legal", "Content",
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+  "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi",
+  "Jammu and Kashmir", "Ladakh",
 ];
 
 const testimonials = [
@@ -48,6 +41,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
+  const [nearLocation, setNearLocation] = useState("All");
   const [filteredJobs, setFilteredJobs] = useState([]);
 
   useEffect(() => {
@@ -68,10 +62,14 @@ export default function Home() {
     loadJobs();
   }, []);
 
-  function handleSearch() {
+  useEffect(() => {
+    setFilteredJobs(applyFilters());
+  }, [nearLocation, jobs]);
+
+  function applyFilters() {
     const searchText = search.trim().toLowerCase();
     const locationText = location.trim().toLowerCase();
-    const result = jobs.filter((job) => {
+    return jobs.filter((job) => {
       const matchSearch =
         !searchText ||
         job.title.toLowerCase().includes(searchText) ||
@@ -79,9 +77,15 @@ export default function Home() {
         job.category.toLowerCase().includes(searchText);
       const matchLocation =
         !locationText || job.location.toLowerCase().includes(locationText);
-      return matchSearch && matchLocation;
+      const matchNear =
+        nearLocation === "All" ||
+        (job.location || "").toLowerCase().includes(nearLocation.toLowerCase());
+      return matchSearch && matchLocation && matchNear;
     });
-    setFilteredJobs(result);
+  }
+
+  function handleSearch() {
+    setFilteredJobs(applyFilters());
     setTimeout(() => {
       document.getElementById("jobs")?.scrollIntoView({ behavior: "smooth" });
     }, 100);
@@ -90,104 +94,12 @@ export default function Home() {
   function resetSearch() {
     setSearch("");
     setLocation("");
+    setNearLocation("All");
     setFilteredJobs(jobs);
   }
 
   return (
     <main>
-      {/* Hero Section */}
-      <section className="jh-hero">
-        <div className="jh-hero-orb jh-orb-1" />
-        <div className="jh-hero-orb jh-orb-2" />
-        <div className="jh-hero-orb jh-orb-3" />
-
-        <div className="jh-hero-inner">
-          <span className="jh-hero-badge">
-            <span className="jh-badge-dot" /> {jobs.length || 2400}+ Open Positions
-          </span>
-
-          <h1 className="jh-hero-title">
-            Find Your <span className="jh-gradient-text">Dream Job</span> Today
-          </h1>
-
-          <p className="jh-hero-sub">
-            Connect with thousands of companies and discover opportunities
-            that match your skills and ambition.
-          </p>
-
-          <div className="jh-search-box">
-            <div className="jh-search-field">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input
-                type="text"
-                placeholder="Job title, keyword, or company"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-            </div>
-            <div className="jh-search-divider" />
-            <div className="jh-search-field">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <input
-                type="text"
-                placeholder="Location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              />
-            </div>
-            <button className="jh-search-btn" onClick={handleSearch}>
-              Search Jobs
-            </button>
-          </div>
-
-          <div className="jh-hero-tags">
-            <span>Popular:</span>
-            <button onClick={() => { setSearch("Developer"); handleSearch(); }}>Developer</button>
-            <button onClick={() => { setSearch("Designer"); handleSearch(); }}>Designer</button>
-            <button onClick={() => { setSearch("Remote"); handleSearch(); }}>Remote</button>
-          </div>
-        </div>
-      </section>
-
-      {/* Scrolling Marquee */}
-      <div className="jh-marquee-section">
-        <div className="jh-marquee-track">
-          <div className="jh-marquee-content">
-            {[...marqueeItems, ...marqueeItems, ...marqueeItems].map((item, i) => (
-              <span key={i} className="jh-marquee-item">
-                <span className="jh-marquee-dot" /> {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <section className="jh-stats-section">
-        <div className="jh-container">
-          <div className="jh-stats-grid">
-            <div className="jh-stat">
-              <p className="jh-stat-value">{jobs.length || 2400}+</p>
-              <p className="jh-stat-label">Active Jobs</p>
-            </div>
-            <div className="jh-stat">
-              <p className="jh-stat-value">850+</p>
-              <p className="jh-stat-label">Companies</p>
-            </div>
-            <div className="jh-stat">
-              <p className="jh-stat-value">15K+</p>
-              <p className="jh-stat-label">Job Seekers</p>
-            </div>
-            <div className="jh-stat">
-              <p className="jh-stat-value">95%</p>
-              <p className="jh-stat-label">Success Rate</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Jobs Section */}
       <section id="jobs" className="jh-jobs-section">
         <div className="jh-container">
@@ -196,6 +108,45 @@ export default function Home() {
               Latest <span className="jh-gradient-text">Opportunities</span>
             </h2>
             <p>Browse through our curated list of top jobs</p>
+          </div>
+
+          <div className="jh-near-box">
+            <div className="jh-near-head">
+              <div className="jh-near-heading">
+                <p className="jh-near-eyebrow">Job Search</p>
+                <h3 className="jh-near-title">
+                  Find Jobs Near You
+                  <span className="jh-near-pin">📍</span>
+                </h3>
+              </div>
+
+              <div className="jh-near-actions">
+                <Link href="/offer-job" className="jh-near-btn-post">
+                  + Post a Job
+                </Link>
+                <Link href="/register" className="jh-near-btn-register">
+                  Register
+                </Link>
+                <select
+                  className="jh-near-select"
+                  value={nearLocation}
+                  onChange={(e) => {
+                    setNearLocation(e.target.value);
+                    setTimeout(() => {
+                      document.getElementById("jobs")?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                  }}
+                  aria-label="Filter jobs by state"
+                >
+                  <option value="All">All India</option>
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {loading ? (
@@ -246,32 +197,6 @@ export default function Home() {
               </button>
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Categories */}
-      <section id="about" className="jh-categories-section">
-        <div className="jh-container">
-          <div className="jh-section-header">
-            <h2>
-              Browse by <span className="jh-gradient-text">Category</span>
-            </h2>
-            <p>Explore jobs in your field of expertise</p>
-          </div>
-
-          <div className="jh-categories-grid">
-            {categories.map((cat) => (
-              <button
-                key={cat.name}
-                className="jh-category-card"
-                onClick={() => { setSearch(cat.name === "Remote Jobs" ? "Remote" : cat.name); handleSearch(); }}
-              >
-                <span className="jh-cat-icon">{cat.icon}</span>
-                <h3>{cat.name}</h3>
-                <p>View jobs →</p>
-              </button>
-            ))}
-          </div>
         </div>
       </section>
 
