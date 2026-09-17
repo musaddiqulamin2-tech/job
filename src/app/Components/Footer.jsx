@@ -53,6 +53,13 @@ export default function Footer() {
 
         <div className="jh-footer-bottom">
           <p>&copy; {new Date().getFullYear()} JobCareer. All rights reserved.</p>
+          <div className="jh-footer-legal">
+            <a href="/disclaimer">Disclaimer</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/admin">Admin</a>
+          </div>
         </div>
       </div>
     </footer>

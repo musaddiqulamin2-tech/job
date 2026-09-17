@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 
 const navItems = [
-  { label: "disclaimer", href: "/disclaimer" },
-  { label: "contact", href: "/contact" },
-  { label: "terms", href: "/terms" },
-  { label: "privacy", href: "/privacy" },
-  { label: "pricing", href: "/pricing" },
+  { label: "Admissions", href: "/register" },
+  { label: "Admit Cards", href: "/" },
+  { label: "Jobs", href: "/#ja-news" },
+  { label: "Results", href: "/" },
+  { label: "Schemes", href: "/" },
+  { label: "Scholarships", href: "/" },
+  { label: "Submit Job", href: "/offer-job" },
 ];
 
 export default function Header() {
@@ -55,12 +57,9 @@ export default function Header() {
         <nav className="jh-nav-links">
           {navItems.map((item) => (
             <a key={item.label} href={item.href}>
-              {item.label.replace("-", " ").toUpperCase()}
+              {item.label}
             </a>
           ))}
-          <a href="/offer-job" className="jh-nav-post">
-            Job Post
-          </a>
         </nav>
 
         <div className="jh-nav-mobile-actions">
@@ -83,12 +82,9 @@ export default function Header() {
         <div className="jh-nav-mobile-menu">
           {navItems.map((item) => (
             <a key={item.label} href={item.href} onClick={() => setMenuOpen(false)}>
-              {item.label.replace("-", " ").toUpperCase()}
+              {item.label}
             </a>
           ))}
-          <a href="/offer-job" onClick={() => setMenuOpen(false)} className="jh-nav-post-mobile">
-            + Offer Job
-          </a>
           <a href="/register" onClick={() => setMenuOpen(false)}>
             Register
           </a>
