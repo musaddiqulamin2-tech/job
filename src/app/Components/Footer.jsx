@@ -36,7 +36,7 @@ export default function Footer() {
 
           <div>
             <h3>For Employers</h3>
-            <a href="/offer-job">Post a Job</a>
+            <a href="/submit-job">Post a Job</a>
             <a href="#">Browse Candidates</a>
             <a href="#">Pricing</a>
             <a href="#">Employer Dashboard</a>

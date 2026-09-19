@@ -2,16 +2,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
-  "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
-  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
-  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
-  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi",
-  "Jammu and Kashmir", "Ladakh",
-];
-
 const MOCK_TESTS = [
   "General Knowledge Test",
   "Quantitative Aptitude",
@@ -130,8 +120,6 @@ function CheckIcon() {
 export default function Home() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [nearLocation, setNearLocation] = useState("All");
-  const [filteredJobs, setFilteredJobs] = useState([]);
 
   useEffect(() => {
     async function loadJobs() {
@@ -139,8 +127,7 @@ export default function Home() {
         const res = await fetch("/api/jobs");
         const data = await res.json();
         if (data.success) {
-          setJobs(data.jobs);
-          setFilteredJobs(data.jobs);
+          setJobs(data.jobs || []);
         }
       } catch (error) {
         console.error("Failed to load jobs", error);
@@ -151,18 +138,8 @@ export default function Home() {
     loadJobs();
   }, []);
 
-  useEffect(() => {
-    setFilteredJobs(
-      jobs.filter(
-        (job) =>
-          nearLocation === "All" ||
-          (job.location || "").toLowerCase().includes(nearLocation.toLowerCase())
-      )
-    );
-  }, [nearLocation, jobs]);
-
-  const latestRows = filteredJobs.slice(0, 10);
-  const updatesRows = filteredJobs.slice(10, 20);
+  const latestRows = jobs.slice(0, 10);
+  const updatesRows = jobs.slice(10, 20);
   const categories = [
     ...new Set([
       ...jobs.map((j) => j.category).filter(Boolean),
@@ -188,28 +165,6 @@ export default function Home() {
             </span>
             <span className="ja-join-btn">Get Now</span>
           </a>
-        </div>
-
-        <div className="ja-filter-box">
-          <div className="ja-filter-left">
-            <p className="ja-filter-title">Find Jobs Near You</p>
-            <select
-              className="ja-filter-select"
-              value={nearLocation}
-              onChange={(e) => setNearLocation(e.target.value)}
-              aria-label="Filter jobs by state"
-            >
-              <option value="All">All India</option>
-              {INDIAN_STATES.map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Link href="/offer-job" className="ja-filter-post">
-            + Post a Job
-          </Link>
         </div>
 
         <div className="ja-grid" id="ja-news">
@@ -252,7 +207,7 @@ export default function Home() {
                 No jobs found in your area yet. Check back soon.
               </div>
             )}
-            <a className="ja-more-btn" href="/offer-job">
+            <a className="ja-more-btn" href="/submit-job">
               Post Your Job <ChevronIcon />
             </a>
           </div>
@@ -265,7 +220,7 @@ export default function Home() {
                 {cat}
               </a>
             ))}
-            <a className="ja-more-btn" href="/offer-job">
+            <a className="ja-more-btn" href="/submit-job">
               Post Your Job <ChevronIcon />
             </a>
           </div>

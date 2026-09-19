@@ -19,7 +19,7 @@ export async function GET(request) {
       return Response.json({ success: true, job });
     }
 
-    const { q, location } = Object.fromEntries(searchParams);
+    const { q, location, category } = Object.fromEntries(searchParams);
 
     const query = {};
     if (q) {
@@ -28,6 +28,10 @@ export async function GET(request) {
     }
     if (location) {
       query.location = new RegExp(location, "i");
+    }
+    if (category) {
+      const catRegex = new RegExp(category, "i");
+      query.$or = [{ category: catRegex }, { title: catRegex }];
     }
 
     const jobs = await Job.find(query).sort({ featured: -1, createdAt: -1 });
