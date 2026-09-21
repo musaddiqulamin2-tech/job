@@ -1,168 +1,807 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { getAdmissionPost } from "../../../lib/categoryData";
+import { notFound, redirect } from "next/navigation";
+import { getAdmissionPost, getAdmissionPosts, getSampleJobs, getSampleResults, getAdmitCardPosts } from "../../../lib/categoryData";
+import { loadAdmission } from "../../../lib/admissionData";
+import ShareButtons from "./ShareButtons";
 
-const TYPE_ICON = "M3 6h18m-9 0v12m-6.5 0h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 18.5 6h-13A1.5 1.5 0 0 0 4 7.5v9A1.5 1.5 0 0 0 5.5 18z";
-const ORG_ICON = "M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0H3m16 0h2M7 21h10M9 7h1m1 0h1m-2 4h1m1 0h1m-2 4h1m1 0h1m-4-8H7";
-const STATUS_ICON = "M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z";
-const DATE_ICON = "M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3";
-const CATEGORY_ICON = "M4 6h16M4 10h16M4 14h16M4 18h16";
-const SITE_ICON = "M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9";
-const CALENDAR_ICON = "M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
+export const dynamic = "force-dynamic";
+
+const DATE_ICON = "M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
+const FILE_ICON = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 15h6M9 11h2";
+
+function formatDDMMYYYY(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      return `${day}/${month}/${d.getFullYear()}`;
+    }
+  } catch {
+    return dateStr;
+  }
+  return dateStr;
+}
+
+function formatDisplayDate(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    }
+  } catch {
+    return dateStr;
+  }
+  return dateStr;
+}
+
+function Breadcrumb({ title }) {
+  return (
+    <nav className="ad-breadcrumb" aria-label="Breadcrumb">
+      <Link href="/">Home</Link>
+      <span className="ad-breadcrumb-sep">/</span>
+      <Link href="/admission">Admission</Link>
+      <span className="ad-breadcrumb-sep">/</span>
+      <span className="ad-breadcrumb-current" aria-current="page">
+        {title}
+      </span>
+    </nav>
+  );
+}
+
+function RelatedAdmissions({ currentPost }) {
+  const all = getAdmissionPosts();
+  const related = all
+    .filter((p) => p.slug !== currentPost.slug)
+    .sort((a, b) => {
+      const sameCat = (x) => (x.category === currentPost.category ? 0 : 1);
+      return sameCat(a) - sameCat(b);
+    })
+    .slice(0, 4);
+
+  return (
+    <section className="ad-section ad-related-wrap">
+      <h2 className="ad-section-h">Related Admissions</h2>
+      {related.length > 0 ? (
+        <div className="ad-related-grid">
+          {related.map((p) => (
+            <Link key={p._id} href={p.url || `/admission/${p.slug}`} className="ad-related-card">
+              <span className="ad-related-cat">{p.category}</span>
+              <span className="ad-related-title">{p.title}</span>
+              <span className="ad-related-org">{p.org}</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="ad-muted">More admission updates will be published soon.</p>
+      )}
+    </section>
+  );
+}
+
+function SidebarWidget({ title, items, hrefBase }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="ad-widget">
+      <h3 className="ad-widget-title">{title}</h3>
+      <ul className="ad-widget-list">
+        {items.map((item) => (
+          <li key={item._id || item.slug}>
+            <Link href={item.url || `${hrefBase}/${item.slug}`}>
+              <span className="ad-widget-item-title">{item.title}</span>
+              <span className="ad-widget-item-org">
+                {item.org || item.company || item.status || item.category}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Sidebar() {
+  return (
+    <aside className="ad-sidebar">
+      <SidebarWidget
+        title="Latest Admissions"
+        items={getAdmissionPosts().slice(0, 6)}
+        hrefBase="/admission"
+      />
+      <SidebarWidget
+        title="Latest Jobs"
+        items={getSampleJobs().slice(0, 6)}
+        hrefBase="/job"
+      />
+      <SidebarWidget
+        title="Latest Results"
+        items={getSampleResults().slice(0, 6)}
+        hrefBase="/result"
+      />
+      <SidebarWidget
+        title="Latest Admit Cards"
+        items={getAdmitCardPosts().slice(0, 6)}
+        hrefBase="/admit-card"
+      />
+    </aside>
+  );
+}
+
+function ImportantDates({ post }) {
+  const rows = [];
+  const addRow = (label, value) => {
+    const formatted = formatDDMMYYYY(value);
+    if (formatted) rows.push({ label, value: formatted });
+  };
+  addRow("Application Start", post.applicationStartDate);
+  addRow("Last Date to Apply", post.applicationLastDate);
+  addRow("Examination Date", post.examDate);
+  addRow("Merit List", post.meritListDate);
+  addRow("Counselling", post.counsellingDate);
+  if (post.importantDates && post.importantDates.length) {
+    post.importantDates.forEach((row) => {
+      if (row.label && row.date) rows.push({ label: row.label, value: formatDDMMYYYY(row.date) || row.date });
+    });
+  }
+
+  const fallbackRow = {
+    label: "Schedule",
+    value: `As per the official notification of ${post.org}.`,
+  };
+
+  return (
+    <section className="ad-section">
+      <h2 className="ad-section-h">Important Dates</h2>
+      <div className="ad-wrap-scroll">
+        <table className="ad-table">
+          <tbody>
+            {rows.length > 0
+              ? rows.map((row) => (
+                  <tr key={row.label}>
+                    <th>{row.label}</th>
+                    <td>{row.value}</td>
+                  </tr>
+                ))
+              : (
+                  <tr>
+                    <th>{fallbackRow.label}</th>
+                    <td>{fallbackRow.value}</td>
+                  </tr>
+                )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function EligibilitySection({ post }) {
+  return (
+    <section className="ad-section">
+      <h2 className="ad-section-h">Eligibility Criteria</h2>
+      <div className="ad-wrap-scroll">
+        <table className="ad-table">
+          <tbody>
+            {post.ageLimit ? (
+              <tr>
+                <th>Age Limit</th>
+                <td>{post.ageLimit}</td>
+              </tr>
+            ) : null}
+            {post.eligibility && post.eligibility.length
+              ? post.eligibility.map((item, idx) => (
+                  <tr key={idx}>
+                    <th>{idx === 0 ? "Requirements" : ""}</th>
+                    <td>{item}</td>
+                  </tr>
+                ))
+              : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function ApplicationFee({ post }) {
+  const fees = post.applicationFee;
+  return (
+    <section className="ad-section">
+      <h2 className="ad-section-h">Application Fee</h2>
+      {fees && fees.length ? (
+        <div className="ad-wrap-scroll">
+          <table className="ad-table">
+            <tbody>
+              {fees.map((fee, idx) => (
+                <tr key={idx}>
+                  <th>{fee.category}</th>
+                  <td>{fee.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="ad-muted">
+          Application fee, if any, will be charged as per the official
+          notification of {post.org}.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function AdmissionDetails({ post }) {
+  const rows = [
+    { label: "Admission Name", value: post.title },
+    { label: "Course", value: post.courseName },
+    { label: "Organization", value: post.org },
+    { label: "Academic Year", value: post.admissionYear },
+    { label: "Course Duration", value: post.courseDuration },
+    { label: "Admission Mode", value: post.admissionMode },
+    { label: "Official Authority", value: post.officialAuthority },
+    { label: "Status", value: post.status },
+  ].filter((r) => r.value);
+
+  return (
+    <section className="ad-section">
+      <h2 className="ad-section-h">Admission Details</h2>
+      <div className="ad-wrap-scroll">
+        <table className="ad-table">
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <th>{row.label}</th>
+                <td>{row.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function ImportantLinks({ post }) {
+  const links = (
+    Array.isArray(post.importantLinks) && post.importantLinks.length
+      ? post.importantLinks
+      : [
+          post.applicationUrl && { label: "Apply Online", url: post.applicationUrl },
+          post.officialNotificationUrl && {
+            label: "Official Notification",
+            url: post.officialNotificationUrl,
+          },
+          post.prospectusUrl && {
+            label: "Download Prospectus",
+            url: post.prospectusUrl,
+          },
+          post.officialSite && {
+            label: "Official Website",
+            url: post.officialSite,
+          },
+        ].filter(Boolean)
+  );
+
+  if (!links.length) {
+    return (
+      <section className="ad-section">
+        <h2 className="ad-section-h">Important Links</h2>
+        <p className="ad-muted">
+          Official links for this admission will be published here as soon as
+          they are available on the website of {post.org}.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="ad-section">
+      <h2 className="ad-section-h">Important Links</h2>
+      <div className="ad-wrap-scroll">
+        <table className="ad-table ad-links-table">
+          <thead>
+            <tr>
+              <th style={{ width: "55%" }}>Link</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {links.map((link) => (
+              <tr key={link.label}>
+                <td>{link.label}</td>
+                <td>
+                  {link.url ? (
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ad-open-link"
+                    >
+                      Click Here ↗
+                    </a>
+                  ) : (
+                    <span className="ad-open-link ad-open-link-soon">
+                      Click Here
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="ad-links-note">
+        Always read the full official notification before applying, and apply
+        only through the official portal of the conducting authority.
+      </p>
+    </section>
+  );
+}
+
+function FaqSection({ faq }) {
+  if (!faq || !faq.length) return null;
+  return (
+    <section className="ad-section">
+      <h2 className="ad-section-h">Frequently Asked Questions</h2>
+      <div className="ad-faq">
+        {faq.map((item, idx) => (
+          <details className="ad-faq-item" key={idx} open={idx === 0}>
+            <summary>{item.question}</summary>
+            <div className="ad-faq-answer">{item.answer}</div>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const BOLD_RE = /\*\*([^*]+)\*\*/g;
+const LINK_RE = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+
+function InlineRichText({ text }) {
+  const tokens = [];
+  let rest = text || "";
+  const combined = new RegExp(
+    `(\\*\\*[^*]+\\*\\*|\\[[^\\]]+\\]\\(https?:\\/\\/[^)\\s]+\\))`,
+    "g"
+  );
+  let m;
+  let last = 0;
+  while ((m = combined.exec(rest))) {
+    if (m.index > last) tokens.push(rest.slice(last, m.index));
+    const token = m[0];
+    if (token.startsWith("**")) {
+      tokens.push(<strong key={tokens.length}>{token.slice(2, -2)}</strong>);
+    } else {
+      const lm = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(token);
+      if (lm) {
+        tokens.push(
+          <a key={tokens.length} href={lm[2]} target="_blank" rel="noopener noreferrer" className="ad-inline-link">
+            {lm[1]}
+          </a>
+        );
+      } else {
+        tokens.push(token);
+      }
+    }
+    last = m.index + token.length;
+  }
+  if (last < rest.length) tokens.push(rest.slice(last));
+  return <>{tokens}</>;
+}
+
+function FeaturedImage({ post }) {
+  if (post.featuredImage) {
+    return (
+      <figure className="ad-feature-wrap">
+        <img
+          className="ad-featured"
+          src={post.featuredImage}
+          alt={post.title}
+        />
+      </figure>
+    );
+  }
+  return (
+    <div className="ad-featured ad-featured-fallback" role="img" aria-label={post.title}>
+      <div className="ad-ff-badge">{post.category}</div>
+      <div className="ad-ff-title">{post.title}</div>
+      <div className="ad-ff-org">{post.org}</div>
+    </div>
+  );
+}
+
+function QuickFacts({ post }) {
+  const facts = [
+    { label: "Course", value: post.courseName },
+    { label: "Session", value: post.admissionYear },
+    { label: "Total Seats", value: post.totalSeats },
+    { label: "Organization", value: post.org },
+    { label: "Application Mode", value: post.admissionMode },
+    { label: "Start Date", value: formatDDMMYYYY(post.applicationStartDate) },
+    { label: "Last Date", value: formatDDMMYYYY(post.applicationLastDate) },
+    { label: "Exam Date", value: formatDDMMYYYY(post.examDate) },
+    { label: "Merit List", value: formatDDMMYYYY(post.meritListDate) },
+    { label: "Counselling", value: formatDDMMYYYY(post.counsellingDate) },
+  ].filter((f) => f.value);
+
+  if (!facts.length) return null;
+
+  return (
+    <section className="ad-facts" aria-label="Key facts">
+      <div className="ad-facts-grid">
+        {facts.map((f) => (
+          <div className="ad-fact" key={f.label}>
+            <span className="ad-fact-label">{f.label}</span>
+            <span className="ad-fact-value">{f.value}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function VideoEmbed({ post }) {
+  if (!post.videoUrl) return null;
+  return (
+    <figure className="ad-video-wrap">
+      <iframe
+        className="ad-video"
+        src={post.videoUrl}
+        title={`${post.title} – video guide`}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+      />
+    </figure>
+  );
+}
+
+function TagChips({ post }) {
+  const tags = [post.category, post.org, post.status].filter(
+    (t) => typeof t === "string" && t.trim()
+  );
+  if (!tags.length) return null;
+  return (
+    <div className="ad-tags">
+      {tags.map((t) => (
+        <span className="ad-tag" key={t}>
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function parseInlineContent(text) {
+  return <InlineRichText text={text} />;
+}
+
+function ContentBlocks({ blocks }) {
+  if (!blocks || blocks.length === 0) return null;
+  return (
+    <div className="ad-article-body">
+      {blocks.map((block, idx) => {
+        if (block.type === "heading") {
+          return (
+            <h2 className="ad-section-h ad-content-h" key={idx}>
+              {block.text || block.heading}
+            </h2>
+          );
+        }
+        if (block.type === "subheading") {
+          return (
+            <h3 className="ad-sub-heading" key={idx}>
+              {block.text || block.heading}
+            </h3>
+          );
+        }
+        if (block.type === "list") {
+          return block.ordered ? (
+            <ol className="ad-step-list" key={idx}>
+              {block.items.map((item, i) => (
+                <li key={i}>{parseInlineContent(item)}</li>
+              ))}
+            </ol>
+          ) : (
+            <ul className="ad-doc-list" key={idx}>
+              {block.items.map((item, i) => (
+                <li key={i}>{parseInlineContent(item)}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === "note") {
+          return (
+            <div className="ad-note" key={idx}>
+              <strong>Note:</strong> {parseInlineContent(block.text)}
+            </div>
+          );
+        }
+        if (block.type === "table") {
+          return (
+            <div className="ad-wrap-scroll" key={idx}>
+              <table className="ad-table">
+                {block.columns && block.columns.length ? (
+                  <thead>
+                    <tr>
+                      {block.columns.map((col, c) => (
+                        <th key={c}>{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                ) : null}
+                <tbody>
+                  {(block.rows || []).map((row, r) => (
+                    <tr key={r}>
+                      {row.map((cell, c) => (
+                        <td key={c}>{parseInlineContent(cell)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {block.caption && (
+                <p className="ad-table-caption">{block.caption}</p>
+              )}
+            </div>
+          );
+        }
+        if (block.type === "image") {
+          return (
+            <figure className="ad-content-figure" key={idx}>
+              <img
+                className="ad-content-media"
+                src={block.source}
+                alt={block.caption || block.text || ""}
+                loading="lazy"
+              />
+              {block.caption && (
+                <figcaption className="ad-table-caption">
+                  {block.caption}
+                </figcaption>
+              )}
+            </figure>
+          );
+        }
+        if (block.type === "faq") {
+          return <FaqSection key={idx} faq={block.items.map((i) => ({ question: i, answer: block.text }))} />;
+        }
+        return <p className="ad-paragraph" key={idx}>{parseInlineContent(block.text)}</p>;
+      })}
+    </div>
+  );
+}
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const post = getAdmissionPost(slug);
   if (!post) {
-    return { title: "Admission Details | JobCareer" };
+    return {
+      title: "Admission Details | JobCareer",
+    };
   }
+  const description =
+    (post.shortDescription || post.title).length > 160
+      ? `${(post.shortDescription || post.title).slice(0, 157)}...`
+      : post.shortDescription || post.title;
+  const ogImage = post.featuredImage
+    ? [post.featuredImage]
+    : undefined;
   return {
     title: `${post.title} | JobCareer`,
-    description: `Know the ${post.category} ${post.title} by ${post.org}, important dates, eligibility, application process and official website.`,
+    description,
     alternates: {
       canonical: `https://jobcareer.in/admission/${post.slug}`,
+    },
+    openGraph: {
+      title: `${post.title} | JobCareer`,
+      description,
+      url: `https://jobcareer.in/admission/${post.slug}`,
+      type: "article",
+      publishedTime: post.publishedAt || undefined,
+      modifiedTime: post.updatedAt || undefined,
+      images: ogImage,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${post.title} | JobCareer`,
+      description,
+      images: ogImage,
     },
   };
 }
 
-export function generateStaticParams() {
-  return [];
-}
-
 export default async function AdmissionDetailPage({ params }) {
   const { slug } = await params;
-  const post = getAdmissionPost(slug);
+  const post = await loadAdmission(slug);
   if (!post) {
     notFound();
   }
 
-  const details = [
-    { label: "Admission Type", value: post.category, icon: TYPE_ICON },
-    { label: "Organization", value: post.org, icon: ORG_ICON },
-    { label: "Status", value: post.status, icon: STATUS_ICON },
-    { label: "Published", value: post.date, icon: DATE_ICON },
-    { label: "Category", value: "Admission", icon: CATEGORY_ICON },
-  ];
+  if (post.url && post.url !== `/admission/${post.slug}`) {
+    // Redirect flagship admission articles to their canonical public URL.
+    redirect(post.url);
+  }
+
+  const published = formatDisplayDate(post.publishedAt || post.date);
+  const updated = post.updatedAt ? formatDisplayDate(post.updatedAt) : null;
+
+  const iso = (value) => {
+    if (!value) return undefined;
+    try {
+      const d = new Date(value);
+      return isNaN(d.getTime()) ? value : d.toISOString();
+    } catch {
+      return value;
+    }
+  };
+  const canonicalUrl = `https://jobcareer.in/admission/${post.slug}`;
+  const datePublished = iso(post.publishedAt) || iso(post.createdAt);
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.shortDescription || post.title,
+    image: post.featuredImage ? [post.featuredImage] : undefined,
+    datePublished: datePublished,
+    dateModified: iso(post.updatedAt) || datePublished,
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
+    author: { "@type": "Organization", name: "JobCareer", url: "https://jobcareer.in" },
+    publisher: {
+      "@type": "Organization",
+      name: "JobCareer",
+      url: "https://jobcareer.in",
+    },
+    keywords: [post.category, post.org, post.status].filter(Boolean).join(", "),
+    inLanguage: "en-IN",
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://jobcareer.in/" },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Admission",
+        item: "https://jobcareer.in/category/admission",
+      },
+      { "@type": "ListItem", position: 3, name: post.title, item: canonicalUrl },
+    ],
+  };
+  const jsonLd = [articleJsonLd, breadcrumbJsonLd]
+    .filter((o) => JSON.stringify(o).indexOf('"undefined"') === -1);
 
   return (
-    <main className="jh-detail-page">
+    <main className="jh-detail-page ad-detail-page">
       <div className="jh-container">
-        <Link href="/category/admission" className="jh-detail-back">
-          ← Back to Admission
-        </Link>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <Breadcrumb title={post.title} />
 
-        <div className="jh-detail-hero">
-          <div className="jh-detail-hero-orb jh-detail-orb-1" />
-          <div className="jh-detail-hero-orb jh-detail-orb-2" />
-
-          <div className={`jh-job-tag jh-tag-${post.tagColor || "emerald"}`}>
-            {post.category}
-          </div>
-
-          <h1 className="jh-detail-title">{post.title}</h1>
-          <p className="jh-detail-company">{post.org}</p>
-
-          <div className="jh-detail-meta">
-            <span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={DATE_ICON} /></svg>
-              {post.date}
+        <header className="ad-hero">
+          <div
+            className={`ad-hero-orb ad-hero-orb-1`}
+            aria-hidden="true"
+          />
+          <div
+            className={`ad-hero-orb ad-hero-orb-2`}
+            aria-hidden="true"
+          />
+          <div className="ad-hero-top">
+            <span className={`ad-badge ad-badge-${post.tagColor || "emerald"}`}>
+              {post.category}
             </span>
-            <span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={STATUS_ICON} /></svg>
+            <span className="ad-status">
               {post.status}
             </span>
           </div>
 
-          <div className="jh-detail-row">
-            <div className="jh-detail-salary">
-              <span className="jh-detail-salary-label">Admission</span>
-              <strong>{post.category}</strong>
-            </div>
-            <a
-              href={post.officialSite}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="jh-btn jh-btn-primary jh-detail-apply"
-            >
-              Apply / View Official Website
-            </a>
-          </div>
-        </div>
+          <h1 className="ad-title">{post.title}</h1>
 
-        <div className="jh-detail-overview">
-          {details.map((d) => (
-            <div className="jh-detail-info-card" key={d.label}>
-              <span className="jh-detail-info-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={d.icon} /></svg>
+          <div className="ad-hero-meta">
+            {published && (
+              <span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={DATE_ICON} /></svg>
+                Published: {published}
               </span>
-              <span className="jh-detail-info-label">{d.label}</span>
-              <span className="jh-detail-info-value">{d.value}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="jh-detail-body">
-          <h2>About the Admission</h2>
-          <p>
-            {post.org} has published the {post.title}. Candidates who meet the eligibility criteria published in the
-            official notification can apply for admission through the official portal of {post.org}. Applicants are
-            advised to read the complete notification, check the important dates, and keep the required documents ready
-            before submitting the application form.
-          </p>
-
-          <h2>Important Dates</h2>
-          <ul className="jh-detail-list">
-            <li>Application Start: As per the official notification of {post.org}.</li>
-            <li>Last Date to Apply: Mentioned in the official notification.</li>
-            <li>Publication of Ranking / Merit List: After the last date of application.</li>
-            <li>Document Verification and Counselling: As per the schedule of {post.org}.</li>
-          </ul>
-
-          <h2>Eligibility</h2>
-          <ul className="jh-detail-list">
-            <li>Candidates must be a citizen of India / Assam with valid educational certificates.</li>
-            <li>Qualifying examination and minimum percentage as mentioned in the notification.</li>
-            <li>Age limits follow the category and course specific rules of {post.org}.</li>
-            <li>Candidates already holding a seat in the same programme should confirm the reservation rules.</li>
-          </ul>
-
-          <h2>Steps to Apply</h2>
-          <ul className="jh-detail-list">
-            <li>Visit the official website of {post.org} and open the admission portal.</li>
-            <li>Register with a valid mobile number and email address.</li>
-            <li>Fill in the online application form and upload the required documents.</li>
-            <li>Pay the application fee (if applicable) and submit the form.</li>
-            <li>Take a printout of the application form / confirmation page for future reference.</li>
-          </ul>
-
-          <h2>Required Documents</h2>
-          <ul className="jh-detail-list">
-            <li>Aadhaar card and residential proof</li>
-            <li>Educational mark sheets and certificates (HSLC / HSSLC / UG as applicable)</li>
-            <li>Category certificate and income certificate (if applicable)</li>
-            <li>Passport-size photographs and scanned signature</li>
-            <li>Valid email address and mobile number for registration</li>
-          </ul>
-
-          <h2>Important Links</h2>
-          <ul className="jh-detail-list">
-            <li>
-              <span>Official Website: </span>
-              <a href={post.officialSite} target="_blank" rel="noopener noreferrer">
-                {post.org} — {post.category}
-              </a>
-            </li>
-            <li>Latest admission circular and updates on the JobCareer Admission page</li>
-          </ul>
-
-          <div className="jh-detail-cta">
-            <h3>Check the official details</h3>
-            <p>Visit the official website of {post.org} for the complete notification and application form.</p>
-            <a href={post.officialSite} target="_blank" rel="noopener noreferrer" className="jh-btn jh-btn-primary">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 8, verticalAlign: "middle" }}><path d={SITE_ICON} /></svg>
-              Visit Official Website
-            </a>
+            )}
+            {updated && (
+              <span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={DATE_ICON} /></svg>
+                Updated: {updated}
+              </span>
+            )}
+            <span className="ad-hero-cat">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={FILE_ICON} /></svg>
+              Category: Admission
+            </span>
+            {post.readingTime && (
+              <span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
+                {post.readingTime} min read
+              </span>
+            )}
           </div>
+
+          <ShareButtons title={post.title} />
+        </header>
+
+        <div className="ad-detail-grid">
+          <article className="ad-article">
+            <QuickFacts post={post} />
+
+            <FeaturedImage post={post} />
+
+            <section className="ad-section">
+              <p className="ad-intro">
+                {post.shortDescription || post.title}
+              </p>
+            </section>
+
+            <VideoEmbed post={post} />
+
+            <ImportantDates post={post} />
+            <AdmissionDetails post={post} />
+            <EligibilitySection post={post} />
+            <ApplicationFee post={post} />
+
+            {post.selectionProcess && post.selectionProcess.length ? (
+              <section className="ad-section">
+                <h2 className="ad-section-h">Selection Process</h2>
+                <ul className="ad-doc-list">
+                  {post.selectionProcess.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {post.requiredDocuments && post.requiredDocuments.length ? (
+              <section className="ad-section">
+                <h2 className="ad-section-h">Required Documents</h2>
+                <ul className="ad-doc-list">
+                  {post.requiredDocuments.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {post.howToApply && post.howToApply.length ? (
+              <section className="ad-section">
+                <h2 className="ad-section-h">How to Apply</h2>
+                <ol className="ad-step-list">
+                  {post.howToApply.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+
+            <ImportantLinks post={post} />
+
+            <ContentBlocks blocks={post.content} />
+
+            <FaqSection faq={post.faq} />
+
+            <TagChips post={post} />
+
+            <RelatedAdmissions currentPost={post} />
+          </article>
+
+          <Sidebar />
         </div>
       </div>
     </main>

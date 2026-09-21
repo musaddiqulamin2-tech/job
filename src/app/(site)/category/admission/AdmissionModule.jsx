@@ -43,7 +43,7 @@ function BuildingIcon() {
 
 function AdmissionCard({ post, index }) {
   const t = ADMISSION_THEMES[index % ADMISSION_THEMES.length];
-  const href = `/admission/${post.slug}`;
+  const href = post.url || `/admission/${post.slug}`;
 
   return (
     <div className="ac-card sc-card" key={post._id}>

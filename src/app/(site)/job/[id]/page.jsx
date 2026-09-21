@@ -19,6 +19,8 @@ function SampleJobDetail({ job }) {
     { label: "Location", value: job.location, icon: LOCATION_ICON },
   ];
 
+  const officialLink = job.officialLink || null;
+
   return (
     <main className="jh-detail-page">
       <div className="jh-container">
@@ -57,12 +59,23 @@ function SampleJobDetail({ job }) {
               <span className="jh-detail-salary-label">Last Date</span>
               <strong>{job.lastDate}</strong>
             </div>
-            <Link
-              href={`/apply?job=${encodeURIComponent(job.title)}`}
-              className="jh-btn jh-btn-primary jh-detail-apply"
-            >
-              Apply Now
-            </Link>
+            {officialLink ? (
+              <a
+                href={officialLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="jh-btn jh-btn-primary jh-detail-apply"
+              >
+                Apply Now
+              </a>
+            ) : (
+              <Link
+                href={`/apply?job=${encodeURIComponent(job.title)}`}
+                className="jh-btn jh-btn-primary jh-detail-apply"
+              >
+                Apply Now
+              </Link>
+            )}
           </div>
         </div>
 
@@ -98,12 +111,23 @@ function SampleJobDetail({ job }) {
           <div className="jh-detail-cta">
             <h3>Interested in this role?</h3>
             <p>Don&apos;t miss out — apply today and take the next step in your career.</p>
-            <Link
-              href={`/apply?job=${encodeURIComponent(job.title)}`}
-              className="jh-btn jh-btn-primary"
-            >
-              Apply for this Job
-            </Link>
+            {officialLink ? (
+              <a
+                href={officialLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="jh-btn jh-btn-primary"
+              >
+                Apply on Official Website
+              </a>
+            ) : (
+              <Link
+                href={`/apply?job=${encodeURIComponent(job.title)}`}
+                className="jh-btn jh-btn-primary"
+              >
+                Apply for this Job
+              </Link>
+            )}
           </div>
         </div>
       </div>

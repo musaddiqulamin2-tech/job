@@ -1,14 +1,78 @@
 import connectDB from "../../lib/mongodb";
 import Job from "../../lib/models/Job";
+import { getSampleJobs } from "../../lib/categoryData";
+
+const DB_TIMEOUT_MS = 2000;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("db-timeout")), ms)),
+  ]);
+}
+
+const TOKEN_ALIASES = {
+  defence: ["defence", "defense", "army", "navy", "air force", "airforce", "coast guard", "rpf", "bsf", "constable", "agniveer"],
+  bank: ["bank"],
+  it: ["it", "computer", "software", "tech"],
+  railway: ["railway", "rail"],
+  police: ["police"],
+  teaching: ["teaching", "teacher", "tet"],
+};
+
+function tokenMatches(haystack, token) {
+  const aliases = TOKEN_ALIASES[token] || [token];
+  return aliases.some((alias) => {
+    if (alias.length < 3) {
+      return new RegExp(`\\b${alias}\\b`).test(haystack);
+    }
+    return haystack.includes(alias);
+  });
+}
+
+function searchStaticJobs(q, location, category) {
+  let jobs = getSampleJobs();
+  const includes = (value, needle) =>
+    value && value.toLowerCase().includes(needle);
+
+  if (q) {
+    const segments = q
+      .toLowerCase()
+      .split("/")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    jobs = jobs.filter((job) => {
+      const haystack = [job.title, job.company, job.org, job.jobType, job.category, job.location]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return segments.some((segment) => {
+        const tokens = segment.split(/\s+/).filter((t) => t.length > 0);
+        return tokens.every((token) => tokenMatches(haystack, token));
+      });
+    });
+  }
+  if (location) {
+    const loc = location.toLowerCase().trim();
+    jobs = jobs.filter((j) => includes(j.location, loc));
+  }
+  if (category) {
+    const cat = category.toLowerCase().trim();
+    jobs = jobs.filter(
+      (j) => includes(j.category, cat) || includes(j.title, cat)
+    );
+  }
+  return jobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
 
 export async function GET(request) {
-  try {
-    await connectDB();
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  const { q, location, category } = Object.fromEntries(searchParams);
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (id) {
+  if (id) {
+    try {
+      await withTimeout(connectDB(), DB_TIMEOUT_MS);
       const job = await Job.findById(id);
       if (!job) {
         return Response.json(
@@ -17,9 +81,20 @@ export async function GET(request) {
         );
       }
       return Response.json({ success: true, job });
+    } catch (err) {
+      const job = getSampleJobs().find((j) => j._id === id || j.slug === id);
+      if (!job) {
+        return Response.json(
+          { success: false, message: "Job not found" },
+          { status: 404 }
+        );
+      }
+      return Response.json({ success: true, job });
     }
+  }
 
-    const { q, location, category } = Object.fromEntries(searchParams);
+  try {
+    await withTimeout(connectDB(), DB_TIMEOUT_MS);
 
     const query = {};
     if (q) {
@@ -37,11 +112,10 @@ export async function GET(request) {
     const jobs = await Job.find(query).sort({ featured: -1, createdAt: -1 });
     return Response.json({ success: true, jobs });
   } catch (error) {
-    console.error("Get Jobs Error:", error);
-    return Response.json(
-      { success: false, message: "Failed to fetch jobs", error: error.message },
-      { status: 500 }
-    );
+    if (error.message !== "db-timeout") {
+      console.error("Get Jobs Error:", error);
+    }
+    return Response.json({ success: true, jobs: searchStaticJobs(q, location, category) });
   }
 }
 

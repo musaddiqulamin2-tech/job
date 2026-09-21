@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Admissions", href: "/category/admission" },
+  { label: "Admissions", href: "/admission" },
   { label: "Admit Cards", href: "/category/admit-card" },
   { label: "Jobs", href: "/category/job" },
   { label: "Results", href: "/category/results" },
@@ -215,9 +215,6 @@ export default function Header() {
             >
               <SearchIcon />
             </button>
-            <a href="/submit-job" className="jh-nav-post">
-              Job Post
-            </a>
             <button
               className={`jh-hamburger ${menuOpen ? "open" : ""}`}
               onClick={() => setMenuOpen(!menuOpen)}
@@ -330,7 +327,7 @@ export default function Header() {
                       {searchResults.map((job) => (
                         <Link
                           key={job._id}
-                          href={`/job/${job._id}`}
+                          href={`/job/${job.slug || job._id}`}
                           className="ja-search-result-card"
                           onClick={() => setSearchOpen(false)}
                         >
