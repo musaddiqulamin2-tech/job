@@ -1,10 +1,16 @@
-import AdminShell from "./components/AdminShell";
-
 export const metadata = {
   title: "Admin Panel | JobCareer",
-  description: "Admin management panel",
+  description: "JobCareer admin management panel",
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
+  },
 };
 
 export default function AdminLayout({ children }) {
-  return <AdminShell>{children}</AdminShell>;
+  return <>{children}</>;
 }

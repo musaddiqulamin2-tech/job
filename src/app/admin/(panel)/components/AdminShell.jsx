@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const links = [
@@ -40,6 +40,18 @@ const links = [
     ),
   },
   {
+    href: "/admin/users",
+    label: "Users",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/settings",
     label: "Settings",
     icon: (
@@ -55,12 +67,15 @@ const titles = {
   "/admin": "Dashboard",
   "/admin/jobs": "Manage Jobs",
   "/admin/applications": "Applications",
+  "/admin/users": "Users",
   "/admin/settings": "Settings",
 };
 
 export default function AdminShell({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [admin, setAdmin] = useState(null);
 
   useEffect(() => {
     setOpen(false);
@@ -73,14 +88,32 @@ export default function AdminShell({ children }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    fetch("/api/admin/me")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((data) => setAdmin(data.admin))
+      .catch(() => router.replace("/admin/login"));
+  }, [router]);
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch {
+      // ignore network errors — still redirect
+    }
+    router.replace("/admin/login");
+  }
+
   const currentTitle =
     titles[pathname] ||
     Object.keys(titles).find((key) => pathname.startsWith(key)) ||
     "Admin";
 
+  const initials = (admin?.name || "A").slice(0, 2).toUpperCase();
+  const isDetail = pathname !== "/admin" && pathname.startsWith("/admin");
+
   return (
     <div className="admin-shell">
-      {/* Sidebar */}
       <aside className={`admin-sidebar ${open ? "open" : ""}`}>
         <div className="admin-logo">
           <span className="admin-logo-badge">JC</span>
@@ -112,12 +145,17 @@ export default function AdminShell({ children }) {
 
         <div className="admin-sidebar-footer">
           <div className="admin-sidebar-user">
-            <div className="admin-sidebar-avatar">A</div>
+            <div className="admin-sidebar-avatar">{initials}</div>
             <div className="admin-sidebar-user-info">
-              <strong>Admin</strong>
-              <span>admin@jobcareer.com</span>
+              <strong>{admin?.name || "Admin"}</strong>
+              <span>{admin?.email || "Loading..."}</span>
             </div>
-            <button className="admin-sidebar-logout" title="Logout" aria-label="Logout">
+            <button
+              className="admin-sidebar-logout"
+              title="Logout"
+              aria-label="Logout"
+              onClick={handleLogout}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
@@ -125,7 +163,7 @@ export default function AdminShell({ children }) {
               </svg>
             </button>
           </div>
-          <Link href="/" className="admin-view-site">
+          <Link href="/" className="admin-view-site" target="_blank" rel="noreferrer">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-9-9" />
               <path d="M21 3v6h-6" />
@@ -135,14 +173,9 @@ export default function AdminShell({ children }) {
         </div>
       </aside>
 
-      {/* Mobile overlay */}
-      {open && (
-        <div className="admin-overlay" onClick={() => setOpen(false)} />
-      )}
+      {open && <div className="admin-overlay" onClick={() => setOpen(false)} />}
 
-      {/* Main */}
       <div className="admin-content">
-        {/* Topbar */}
         <header className="admin-topbar">
           <button
             className="admin-menu-btn"
@@ -167,21 +200,11 @@ export default function AdminShell({ children }) {
 
           <h1 className="admin-topbar-title">{currentTitle}</h1>
 
-          <div className="admin-topbar-right">
-            <div className="admin-search">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input type="text" placeholder="Search..." />
-            </div>
-            <button className="admin-topbar-icon" aria-label="Notifications">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            </button>
-          </div>
+          {isDetail && (
+            <Link href="/admin" className="admin-topbar-back">
+              ← Dashboard
+            </Link>
+          )}
         </header>
 
         <main className="admin-main">{children}</main>

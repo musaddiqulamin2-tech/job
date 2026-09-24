@@ -1,6 +1,7 @@
 import connectDB from "../../lib/mongodb";
 import Job from "../../lib/models/Job";
 import { getSampleJobs } from "../../lib/categoryData";
+import { getSession, unauthorized } from "../../lib/auth";
 
 const DB_TIMEOUT_MS = 2000;
 
@@ -120,6 +121,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const session = await getSession();
+  if (!session) return unauthorized();
+
   try {
     await connectDB();
     const data = await request.json();
@@ -136,6 +140,9 @@ export async function POST(request) {
 }
 
 export async function DELETE(request) {
+  const session = await getSession();
+  if (!session) return unauthorized();
+
   try {
     await connectDB();
 

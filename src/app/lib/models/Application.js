@@ -9,6 +9,19 @@ const ApplicationSchema = new mongoose.Schema(
     coverMessage: String,
     resumeUrl: String,
     photoUrl: String,
+    status: {
+      type: String,
+      enum: ["Pending", "Reviewing", "Shortlisted", "Rejected", "Selected"],
+      default: "Pending",
+    },
+    statusNote: {
+      type: String,
+      default: "",
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

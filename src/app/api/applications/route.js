@@ -1,6 +1,7 @@
 import connectDB from "../../lib/mongodb";
 import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
+import { getSession, unauthorized } from "../../lib/auth";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -43,6 +44,19 @@ const applicationSchema = new mongoose.Schema(
     photoUrl: {
       type: String,
       default: "",
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Reviewing", "Shortlisted", "Rejected", "Selected"],
+      default: "Pending",
+    },
+    statusNote: {
+      type: String,
+      default: "",
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
     },
   },
   {
@@ -90,7 +104,8 @@ export async function POST(request) {
     }
 
     // MongoDB me application save
-    const application = await Application.create({
+    const application =
+      await Application.create({
       jobTitle: data.jobTitle,
       fullName: data.fullName,
       email: data.email,
@@ -98,6 +113,7 @@ export async function POST(request) {
       coverMessage: data.coverMessage,
       resumeUrl: resumeUrl,
       photoUrl: photoUrl,
+      status: "Pending",
     });
 
     return Response.json(
@@ -122,6 +138,9 @@ export async function POST(request) {
   }
 }
 export async function GET() {
+  const session = await getSession();
+  if (!session) return unauthorized();
+
   try {
     await connectDB();
 

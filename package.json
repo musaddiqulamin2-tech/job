@@ -5,10 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "seed:admin": "node --env-file=.env.local scripts/seed-admin.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cloudinary": "^2.11.0",
+    "jose": "^6.2.12",
     "mongoose": "^9.9.5",
     "next": "16.2.12",
     "next-cloudinary": "^6.18.8",

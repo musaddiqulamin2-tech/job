@@ -58,6 +58,23 @@ const JobSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    status: {
+      type: String,
+      enum: ["Active", "Inactive", "Expired"],
+      default: "Active",
+    },
+    vacancies: {
+      type: Number,
+      default: 0,
+    },
+    lastDate: {
+      type: String,
+      default: "",
+    },
+    officialLink: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

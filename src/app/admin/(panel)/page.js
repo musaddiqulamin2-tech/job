@@ -1,27 +1,11 @@
-import connectDB from "../lib/mongodb";
-import mongoose from "mongoose";
-import Job from "../lib/models/Job";
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminBarChart from "./components/AdminBarChart";
+import { Spinner, ErrorState, EmptyState, StatusBadge } from "./components/AdminUI";
 
-export const dynamic = "force-dynamic";
-
-const applicationSchema = new mongoose.Schema(
-  {
-    jobTitle: String,
-    fullName: String,
-    email: String,
-    phone: String,
-    coverMessage: String,
-    resumeUrl: String,
-    photoUrl: String,
-    createdAt: Date,
-  },
-  { timestamps: true }
-);
-
-const Application =
-  mongoose.models.Application ||
-  mongoose.model("Application", applicationSchema);
+const colors = ["#2563eb", "#16a34a", "#f59e0b", "#db2777", "#7c3aed"];
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString("en-IN", {
@@ -30,125 +14,90 @@ function formatDate(date) {
   });
 }
 
+function formatDateTime(date) {
+  if (!date) return "";
+  return new Date(date).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function titleCase(str) {
   return str
-    ? str
+    ? String(str)
         .split(" ")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(" ")
     : "";
 }
 
-export default async function AdminDashboard() {
+export default function AdminDashboard() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
   const now = new Date();
 
-  let totalApplications = 0;
-  let weeklyCount = 0;
-  let recentApplications = [];
-  let perDay = [];
-  let perJob = [];
-  let openJobs = [];
-  let jobCategories = 0;
-
-  try {
-    await connectDB();
-
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - 7);
-
-    const [total, weekly] = await Promise.all([
-      Application.countDocuments(),
-      Application.countDocuments({ createdAt: { $gte: weekStart } }),
-    ]);
-
-    totalApplications = total;
-    weeklyCount = weekly;
-
-    openJobs = await Job.find()
-      .sort({ createdAt: -1 })
-      .limit(3)
-      .lean();
-
-    jobCategories = await Job.distinct("category");
-
-    recentApplications = await Application.find()
-      .sort({ createdAt: -1 })
-      .limit(6)
-      .lean();
-
-    const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      d.setHours(0, 0, 0, 0);
-      const next = new Date(d);
-      next.setDate(d.getDate() + 1);
-      days.push({ day: d, next });
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/dashboard");
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message || "Failed to load dashboard.");
+      }
+      setData(json);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
-
-    const dailyCounts = await Application.aggregate([
-      { $match: { createdAt: { $gte: days[0].day } } },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" },
-          },
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    perDay = days.map(({ day, next }) => {
-      const match = dailyCounts.find(
-        (c) =>
-          c._id.year === day.getFullYear() &&
-          c._id.month === day.getMonth() + 1 &&
-          c._id.day === day.getDate()
-      );
-      return { label: formatDate(day), value: match ? match.count : 0 };
-    });
-
-    const jobCounts = await Application.aggregate([
-      { $group: { _id: "$jobTitle", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-    ]);
-
-    const jobTotals = jobCounts.reduce((sum, j) => sum + j.count, 0);
-    perJob = jobCounts.map((j) => ({
-      title: j._id,
-      count: j.count,
-      percent: jobTotals ? Math.round((j.count / jobTotals) * 100) : 0,
-    }));
-  } catch (error) {
-    console.error("Dashboard data error:", error);
   }
 
-  const colors = ["#2563eb", "#16a34a", "#f59e0b", "#db2777", "#7c3aed"];
+  useEffect(() => {
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="admin-page">
+        <Spinner label="Loading dashboard..." />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="admin-page">
+        <ErrorState message={error} onRetry={load} />
+      </div>
+    );
+  }
+
+  const { stats, perDay, perJob, recentApplications, openJobs } = data;
 
   return (
     <div className="admin-page">
-      {/* Welcome banner */}
       <div className="admin-welcome">
         <div className="admin-welcome-text">
           <h1>Dashboard</h1>
           <p>
-            Welcome back, Admin! Here's your overview for{" "}
+            Welcome back! Here&apos;s your overview for{" "}
             {now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        <a href="/admin/jobs" className="admin-welcome-btn">
+        <Link href="/admin/jobs/new" className="admin-welcome-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Post New Job
-        </a>
+        </Link>
       </div>
 
-      {/* Colorful gradient stat cards */}
       <div className="admin-stats">
         <div className="admin-stat-card grad-blue">
           <div className="admin-stat-top">
@@ -160,9 +109,9 @@ export default async function AdminDashboard() {
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </span>
-            <span className="admin-stat-badge">↑ {weeklyCount} this week</span>
+            <span className="admin-stat-badge">↑ {stats.weeklyApplications} this week</span>
           </div>
-          <p className="admin-stat-value">{totalApplications}</p>
+          <p className="admin-stat-value">{stats.totalApplications}</p>
           <p className="admin-stat-label">Total Applications</p>
         </div>
 
@@ -176,7 +125,7 @@ export default async function AdminDashboard() {
             </span>
             <span className="admin-stat-badge">Active</span>
           </div>
-          <p className="admin-stat-value">{openJobs.filter((j) => j.active !== false).length || 0}</p>
+          <p className="admin-stat-value">{stats.activeJobs}</p>
           <p className="admin-stat-label">Open Positions</p>
         </div>
 
@@ -184,14 +133,13 @@ export default async function AdminDashboard() {
           <div className="admin-stat-top">
             <span className="admin-stat-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
               </svg>
             </span>
-            <span className="admin-stat-badge">Last 7 days</span>
+            <span className="admin-stat-badge">Total</span>
           </div>
-          <p className="admin-stat-value">{weeklyCount}</p>
-          <p className="admin-stat-label">New This Week</p>
+          <p className="admin-stat-value">{stats.totalJobs}</p>
+          <p className="admin-stat-label">Total Jobs</p>
         </div>
 
         <div className="admin-stat-card grad-purple">
@@ -204,14 +152,13 @@ export default async function AdminDashboard() {
                 <rect x="3" y="16" width="7" height="5" rx="1" />
               </svg>
             </span>
-            <span className="admin-stat-badge">{jobCategories.length} Types</span>
+            <span className="admin-stat-badge">{stats.jobCategories} Types</span>
           </div>
-          <p className="admin-stat-value">{jobCategories.length}</p>
+          <p className="admin-stat-value">{stats.jobCategories}</p>
           <p className="admin-stat-label">Job Categories</p>
         </div>
       </div>
 
-      {/* Chart + Distribution */}
       <div className="admin-dash-row">
         <div className="admin-card admin-chart-card">
           <div className="admin-card-header">
@@ -225,11 +172,8 @@ export default async function AdminDashboard() {
             </span>
           </div>
 
-          {totalApplications === 0 ? (
-            <div className="no-jobs">
-              <h3>No data yet</h3>
-              <p>The chart will populate once candidates apply.</p>
-            </div>
+          {stats.totalApplications === 0 ? (
+            <EmptyState title="No data yet" sub="The chart will populate once candidates apply." />
           ) : (
             <AdminBarChart data={perDay} />
           )}
@@ -244,9 +188,7 @@ export default async function AdminDashboard() {
           </div>
 
           {perJob.length === 0 ? (
-            <div className="no-jobs">
-              <h3>No applications yet</h3>
-            </div>
+            <EmptyState title="No applications yet" />
           ) : (
             <div className="admin-progress-list">
               {perJob.map((job, i) => (
@@ -276,7 +218,6 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* Lists */}
       <div className="admin-grid">
         <div className="admin-card">
           <div className="admin-card-header">
@@ -284,24 +225,30 @@ export default async function AdminDashboard() {
               <h2>Recent Applications</h2>
               <p className="admin-card-sub">Latest candidates to apply</p>
             </div>
-            <a href="/admin/applications" className="admin-link">
+            <Link href="/admin/applications" className="admin-link">
               View All →
-            </a>
+            </Link>
           </div>
 
           {recentApplications.length === 0 ? (
-            <div className="no-jobs">
-              <h3>No applications yet</h3>
-            </div>
+            <EmptyState title="No applications yet" />
           ) : (
             <div className="admin-app-list">
               {recentApplications.map((app, idx) => (
-                <div className="admin-app-row" key={String(app._id)}>
+                <Link
+                  href={`/admin/applications/${app._id}`}
+                  className="admin-app-row"
+                  key={app._id}
+                >
                   <div
                     className="admin-app-avatar"
-                    style={{ background: colors[idx % colors.length] + "1a", color: colors[idx % colors.length] }}
+                    style={{
+                      background: colors[idx % colors.length] + "1a",
+                      color: colors[idx % colors.length],
+                    }}
                   >
                     {app.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={app.photoUrl} alt={app.fullName} />
                     ) : (
                       titleCase(app.fullName)?.charAt(0) || "?"
@@ -312,12 +259,10 @@ export default async function AdminDashboard() {
                     <span>{app.jobTitle}</span>
                   </div>
                   <div className="admin-app-right">
-                    <span className="admin-app-date">
-                      {formatDate(app.createdAt)}
-                    </span>
-                    <span className="admin-badge admin-badge-blue">New</span>
+                    <StatusBadge status={app.status} />
+                    <span className="admin-app-date">{formatDate(app.createdAt)}</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
@@ -329,16 +274,26 @@ export default async function AdminDashboard() {
               <h2>Available Jobs</h2>
               <p className="admin-card-sub">Currently hiring roles</p>
             </div>
-            <a href="/admin/jobs" className="admin-link">
+            <Link href="/admin/jobs" className="admin-link">
               Manage →
-            </a>
+            </Link>
           </div>
 
           <div className="admin-position-list">
             {openJobs.length > 0 ? (
               openJobs.map((job, i) => (
-                <div className="admin-position-row" key={String(job._id)}>
-                  <div className="admin-position-icon" style={{ background: colors[i % colors.length] + "1a", color: colors[i % colors.length] }}>
+                <Link
+                  href={`/admin/jobs/${job._id}`}
+                  className="admin-position-row"
+                  key={job._id}
+                >
+                  <div
+                    className="admin-position-icon"
+                    style={{
+                      background: colors[i % colors.length] + "1a",
+                      color: colors[i % colors.length],
+                    }}
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="2" y="7" width="20" height="14" rx="2" />
                       <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
@@ -349,18 +304,22 @@ export default async function AdminDashboard() {
                     <span>{job.company}</span>
                   </div>
                   <div className="admin-app-right">
-                    <span className="admin-app-date">{job.location}</span>
-                    <span className={`admin-badge ${job.active === false ? "admin-badge-red" : "admin-badge-green"}`}>
-                      {job.active === false ? "Inactive" : "Open"}
+                    <span className="admin-app-date">
+                      {job.location} • {formatDateTime(job.createdAt)}
                     </span>
+                    <StatusBadge status={job.status} />
                   </div>
-                </div>
+                </Link>
               ))
             ) : (
-              <div className="no-jobs">
-                <h3>No jobs posted yet</h3>
-                <a href="/admin/jobs" className="admin-link">Post your first job →</a>
-              </div>
+              <EmptyState
+                title="No jobs posted yet"
+                action={
+                  <Link href="/admin/jobs/new" className="admin-link">
+                    Post your first job →
+                  </Link>
+                }
+              />
             )}
           </div>
         </div>
