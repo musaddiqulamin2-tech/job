@@ -1,0 +1,28 @@
+{
+  "name": "job-career-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "fix-imports": "node scripts/fix-imports.mjs",
+    "transform": "node scripts/transform.mjs",
+    "seed:admin": "node --env-file=.env scripts/seed-admin.js",
+    "init:db": "node --env-file=.env scripts/init-db.js",
+    "index:sync": "node --env-file=.env scripts/sync-indexes.js",
+    "seed:jobs": "node --env-file=.env scripts/seed-jobs.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jose": "^6.2.12",
+    "mongoose": "^9.9.5"
+  }
+}
