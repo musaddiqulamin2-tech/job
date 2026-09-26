@@ -1,4 +1,4 @@
-export const DB_TIMEOUT_MS = 5000;
+export const DB_TIMEOUT_MS = 8000;
 
 export function withTimeout(promise, ms = DB_TIMEOUT_MS) {
   return Promise.race([
