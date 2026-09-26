@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Spinner, ErrorState, Toast } from "../components/AdminUI";
+import { csrfToken } from "../components/api";
+import { POST_CATEGORY_META } from "../../../lib/postMeta";
+
+const CMS_CATEGORY_KEYS = Object.keys(POST_CATEGORY_META);
+const SOCIAL_KEYS = ["facebook", "twitter", "instagram", "linkedin", "youtube", "telegram", "whatsapp"];
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState("general");
@@ -16,6 +21,21 @@ export default function AdminSettings() {
     contactPhone: "",
     siteTagline: "",
     aboutText: "",
+    siteLogo: "",
+    favicon: "",
+    footerText: "",
+    socialLinks: {
+      facebook: "",
+      twitter: "",
+      instagram: "",
+      linkedin: "",
+      youtube: "",
+      telegram: "",
+      whatsapp: "",
+    },
+    homepageCategories: CMS_CATEGORY_KEYS.slice(0, 5),
+    featuredSlots: { enabled: false, count: 4 },
+    postOrder: "latest",
   });
 
   const [notifications, setNotifications] = useState({
@@ -51,6 +71,24 @@ export default function AdminSettings() {
         contactPhone: json.settings.contactPhone,
         siteTagline: json.settings.siteTagline,
         aboutText: json.settings.aboutText,
+        siteLogo: json.settings.siteLogo,
+        favicon: json.settings.favicon,
+        footerText: json.settings.footerText,
+        socialLinks: {
+          facebook: json.settings.socialLinks?.facebook || "",
+          twitter: json.settings.socialLinks?.twitter || "",
+          instagram: json.settings.socialLinks?.instagram || "",
+          linkedin: json.settings.socialLinks?.linkedin || "",
+          youtube: json.settings.socialLinks?.youtube || "",
+          telegram: json.settings.socialLinks?.telegram || "",
+          whatsapp: json.settings.socialLinks?.whatsapp || "",
+        },
+        homepageCategories: json.settings.homepageCategories || CMS_CATEGORY_KEYS.slice(0, 5),
+        featuredSlots: {
+          enabled: Boolean(json.settings.featuredSlots?.enabled),
+          count: Number(json.settings.featuredSlots?.count) || 4,
+        },
+        postOrder: json.settings.postOrder || "latest",
       });
       setNotifications(json.settings.notifications);
     } catch (e) {
@@ -88,7 +126,7 @@ export default function AdminSettings() {
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken() },
         body: JSON.stringify(general),
       });
       const json = await res.json();
@@ -109,7 +147,7 @@ export default function AdminSettings() {
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken() },
         body: JSON.stringify({ notifications }),
       });
       const json = await res.json();
@@ -306,6 +344,123 @@ export default function AdminSettings() {
                   onChange={(e) => setGeneral({ ...general, aboutText: e.target.value })}
                   placeholder="Short description about your site"
                 />
+              </div>
+
+              <h3 className="t-section-title">Branding</h3>
+              <div className="admin-form-row t-row2">
+                <div className="admin-form-group">
+                  <label htmlFor="siteLogo">Site Logo URL</label>
+                  <input
+                    id="siteLogo"
+                    type="text"
+                    value={general.siteLogo}
+                    onChange={(e) => setGeneral({ ...general, siteLogo: e.target.value })}
+                    placeholder="https://res.cloudinary.com/.../logo.png"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label htmlFor="favicon">Favicon URL</label>
+                  <input
+                    id="favicon"
+                    type="text"
+                    value={general.favicon}
+                    onChange={(e) => setGeneral({ ...general, favicon: e.target.value })}
+                    placeholder="https://res.cloudinary.com/.../favicon.ico"
+                  />
+                </div>
+              </div>
+              <div className="admin-form-group">
+                <label htmlFor="footerText">Footer Text</label>
+                <textarea
+                  id="footerText"
+                  rows="2"
+                  value={general.footerText}
+                  onChange={(e) => setGeneral({ ...general, footerText: e.target.value })}
+                  placeholder="Footer copyright / short description"
+                />
+              </div>
+
+              <h3 className="t-section-title">Social Links</h3>
+              <div className="admin-form-row t-row2">
+                {SOCIAL_KEYS.map((key) => (
+                  <div className="admin-form-group" key={key}>
+                    <label htmlFor={`social-${key}`}>{key[0].toUpperCase() + key.slice(1)}</label>
+                    <input
+                      id={`social-${key}`}
+                      type="text"
+                      value={general.socialLinks[key] || ""}
+                      onChange={(e) =>
+                        setGeneral({ ...general, socialLinks: { ...general.socialLinks, [key]: e.target.value } })
+                      }
+                      placeholder={`https://.../${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="t-section-title">Homepage Sections</h3>
+              <p className="admin-card-sub">Choose which categories appear on the public homepage.</p>
+              <div className="t-cat-grid">
+                {CMS_CATEGORY_KEYS.map((c) => {
+                  const active = general.homepageCategories.includes(c);
+                  return (
+                    <label className={`t-cat-chip ${active ? "active" : ""}`} key={c}>
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() =>
+                          setGeneral({
+                            ...general,
+                            homepageCategories: active
+                              ? general.homepageCategories.filter((x) => x !== c)
+                              : [...general.homepageCategories, c].slice(0, 7),
+                          })
+                        }
+                      />
+                      {POST_CATEGORY_META[c].plural}
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="admin-form-row t-row2">
+                <div className="admin-form-group">
+                  <label htmlFor="postOrder">Post Order</label>
+                  <select
+                    id="postOrder"
+                    value={general.postOrder}
+                    onChange={(e) => setGeneral({ ...general, postOrder: e.target.value })}
+                  >
+                    <option value="latest">Latest first</option>
+                    <option value="featured">Featured first</option>
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label htmlFor="featuredCount">Featured Slots</label>
+                  <div className="t-inline-row">
+                    <select
+                      id="featuredCount"
+                      value={general.featuredSlots.count}
+                      onChange={(e) =>
+                        setGeneral({ ...general, featuredSlots: { enabled: true, count: Number(e.target.value) || 4 } })
+                      }
+                    >
+                      {[4, 6, 8, 10, 12].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                    <label className="admin-switch">
+                      <input
+                        type="checkbox"
+                        checked={general.featuredSlots.enabled}
+                        onChange={(e) =>
+                          setGeneral({ ...general, featuredSlots: { ...general.featuredSlots, enabled: e.target.checked } })
+                        }
+                      />
+                      <span className="admin-switch-slider" />
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div className="admin-form-actions">

@@ -111,12 +111,37 @@ export async function GET(request) {
     }
 
     const jobs = await Job.find(query).sort({ featured: -1, createdAt: -1 });
-    return Response.json({ success: true, jobs });
+
+    let cmsPosts = [];
+    try {
+      const { listPublishedPosts } = await import("../../lib/cms");
+      const { posts } = await listPublishedPosts({ page: 1, limit: 10 });
+      cmsPosts = (posts || []).map((p) => ({
+        _source: "cms",
+        _id: `cms-${p.slug}`,
+        slug: p.slug,
+        title: p.title,
+        category: p.category,
+        location: p.location,
+        company: p.organization,
+        org: p.organization,
+        summary: p.summary,
+        lastDate: p.lastDate,
+        vacancyCount: p.vacancyCount,
+        featuredImage: p.featuredImage,
+        publishedAt: p.publishedAt,
+        createdAt: p.publishedAt || p.createdAt,
+      }));
+    } catch (cmsErr) {
+      console.error("Get CMS posts Error:", cmsErr.message);
+    }
+
+    return Response.json({ success: true, jobs, cmsPosts, cmsCount: cmsPosts.length });
   } catch (error) {
     if (error.message !== "db-timeout") {
       console.error("Get Jobs Error:", error);
     }
-    return Response.json({ success: true, jobs: searchStaticJobs(q, location, category) });
+    return Response.json({ success: true, jobs: searchStaticJobs(q, location, category), cmsPosts: [], cmsCount: 0 });
   }
 }
 

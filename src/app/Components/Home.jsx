@@ -151,7 +151,7 @@ export default function Home() {
     <main className="ja-home">
       <div className="ja-home-inner">
         <div className="ja-join-row">
-          <a className="ja-join ja-join-wa" href="#" rel="nofollow">
+          <a className="ja-join ja-join-wa" href="https://chat.whatsapp.com/CjdwvyIXjXV2Lg2CG1iUM0" target="_blank" rel="noopener noreferrer">
             <span className="ja-join-txt">
               <WhatsAppIcon />
               WhatsApp Channel

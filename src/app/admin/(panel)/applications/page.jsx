@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Spinner,
@@ -13,6 +13,7 @@ import {
 } from "../components/AdminUI";
 
 const pageSize = 12;
+const LIVE_REFRESH_MS = 20000;
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString("en-IN", {
@@ -26,6 +27,7 @@ function formatTime(date) {
   return new Date(date).toLocaleTimeString("en-IN", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
 }
 
@@ -55,6 +57,9 @@ export default function AdminApplications() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [toast, setToast] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [clock, setClock] = useState(() => new Date());
+  const totalRef = useRef(0);
 
   function showToast(type, message) {
     setToast({ type, message });
@@ -62,8 +67,9 @@ export default function AdminApplications() {
   }
 
   const load = useCallback(
-    async (search = q, statusFilter = status, pageNum = page) => {
-      setLoading(true);
+    async (search = q, statusFilter = status, pageNum = page, silent = false) => {
+      if (!(silent && applications.length > 0)) setLoading(true);
+      if (silent) setSyncing(true);
       setError("");
       try {
         const params = new URLSearchParams({
@@ -78,14 +84,21 @@ export default function AdminApplications() {
         if (!res.ok) {
           throw new Error(json.message || "Failed to load applications.");
         }
+        if (silent && json.total > totalRef.current && (search || statusFilter)) {
+          showToast("success", `${json.total - totalRef.current} new application(s) matching your filters.`);
+        } else if (silent && json.total > totalRef.current) {
+          showToast("success", `${json.total - totalRef.current} new application(s) just arrived 🎉`);
+        }
+        totalRef.current = json.total;
         setApplications(json.applications);
         setTotal(json.total);
         setTotalPages(json.totalPages);
         setPage(pageNum);
       } catch (e) {
-        setError(e.message);
+        if (!silent) setError(e.message);
       } finally {
         setLoading(false);
+        setSyncing(false);
       }
     },
     []
@@ -93,6 +106,16 @@ export default function AdminApplications() {
 
   useEffect(() => {
     load();
+    const tick = setInterval(() => setClock(new Date()), 1000);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        load(q, status, page, true);
+      }
+    }, LIVE_REFRESH_MS);
+    return () => {
+      clearInterval(tick);
+      clearInterval(id);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,6 +138,11 @@ export default function AdminApplications() {
           <h1>Applications</h1>
           <p>Review candidates who applied to your jobs.</p>
         </div>
+        <span className={`admin-live-chip ${syncing ? "syncing" : ""}`} title={`Auto-refreshes every ${LIVE_REFRESH_MS / 1000} seconds`}>
+          <span className="chip-dot" />
+          Live
+          <em>• {formatTime(clock)}</em>
+        </span>
       </div>
 
       <div className="admin-apps-filterbar">

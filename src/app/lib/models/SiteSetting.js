@@ -11,6 +11,18 @@ const SiteSettingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    siteTagline: {
+      type: String,
+      default: "",
+    },
+    siteLogo: {
+      type: String,
+      default: "",
+    },
+    favicon: {
+      type: String,
+      default: "",
+    },
     contactEmail: {
       type: String,
       default: "",
@@ -19,9 +31,31 @@ const SiteSettingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    siteTagline: {
+    footerText: {
       type: String,
       default: "",
+    },
+    socialLinks: {
+      facebook: { type: String, default: "" },
+      twitter: { type: String, default: "" },
+      instagram: { type: String, default: "" },
+      linkedin: { type: String, default: "" },
+      youtube: { type: String, default: "" },
+      telegram: { type: String, default: "" },
+      whatsapp: { type: String, default: "" },
+    },
+    homepageCategories: {
+      type: [String],
+      default: ["government-job", "private-job", "admit-card", "result", "admission"],
+    },
+    featuredSlots: {
+      enabled: { type: Boolean, default: false },
+      count: { type: Number, default: 4 },
+    },
+    postOrder: {
+      type: String,
+      enum: ["latest", "featured"],
+      default: "latest",
     },
     aboutText: {
       type: String,

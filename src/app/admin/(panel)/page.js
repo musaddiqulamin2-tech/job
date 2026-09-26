@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AdminBarChart from "./components/AdminBarChart";
-import { Spinner, ErrorState, EmptyState, StatusBadge } from "./components/AdminUI";
+import { Spinner, ErrorState, EmptyState, StatusBadge, Toast } from "./components/AdminUI";
 
 const colors = ["#2563eb", "#16a34a", "#f59e0b", "#db2777", "#7c3aed"];
+const LIVE_REFRESH_MS = 15000;
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString("en-IN", {
@@ -24,6 +25,15 @@ function formatDateTime(date) {
   });
 }
 
+function formatTime(date) {
+  if (!date) return "";
+  return new Date(date).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 function titleCase(str) {
   return str
     ? String(str)
@@ -37,11 +47,22 @@ export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [recentPosts, setRecentPosts] = useState([]);
+  const [syncing, setSyncing] = useState(false);
+  const [clock, setClock] = useState(() => new Date());
+  const [toast, setToast] = useState(null);
 
+  const dataRef = useRef(null);
   const now = new Date();
 
-  async function load() {
-    setLoading(true);
+  function showToast(type, message) {
+    setToast({ type, message });
+    window.setTimeout(() => setToast(null), 3500);
+  }
+
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
+    if (silent) setSyncing(true);
     setError("");
     try {
       const res = await fetch("/api/admin/dashboard");
@@ -49,16 +70,47 @@ export default function AdminDashboard() {
       if (!res.ok) {
         throw new Error(json.message || "Failed to load dashboard.");
       }
+      const prev = dataRef.current;
+      if (silent && prev && json.stats?.totalApplications > prev.stats?.totalApplications) {
+        const gained = json.stats.totalApplications - prev.stats.totalApplications;
+        showToast("success", `${gained} new application${gained > 1 ? "s" : ""} received just now 🎉`);
+      }
+      dataRef.current = json;
       setData(json);
     } catch (e) {
-      setError(e.message);
+      if (!silent) setError(e.message);
     } finally {
       setLoading(false);
+      setSyncing(false);
+    }
+  }
+
+  async function fetchRecent() {
+    try {
+      const res = await fetch("/api/admin/posts?limit=5&sort=updatedAt&order=desc");
+      const json = await res.json();
+      if (res.ok) setRecentPosts(json.posts || []);
+    } catch (e) {
+      /* keep last known list */
     }
   }
 
   useEffect(() => {
+    const tick = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
     load();
+    fetchRecent();
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        load(true);
+        fetchRecent();
+      }
+    }, LIVE_REFRESH_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {
@@ -81,6 +133,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="admin-page">
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
       <div className="admin-welcome">
         <div className="admin-welcome-text">
           <h1>Dashboard</h1>
@@ -89,13 +143,20 @@ export default function AdminDashboard() {
             {now.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        <Link href="/admin/jobs/new" className="admin-welcome-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Post New Job
-        </Link>
+        <div className="admin-welcome-right">
+          <span className={`admin-live-chip ${syncing ? "syncing" : ""}`} title="Auto-refreshes every 15 seconds">
+            <span className="chip-dot" />
+            Live
+            <em>• {formatTime(clock)}</em>
+          </span>
+          <Link href="/admin/jobs/new" className="admin-welcome-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Post New Job
+          </Link>
+        </div>
       </div>
 
       <div className="admin-stats">
@@ -323,6 +384,57 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div>
+            <h2>Recent Posts</h2>
+            <p className="admin-card-sub">Latest content edited in the CMS</p>
+          </div>
+          <Link href="/admin/posts" className="admin-link">
+            Manage Posts →
+          </Link>
+        </div>
+
+        {recentPosts.length === 0 ? (
+          <EmptyState
+            title="No posts yet"
+            action={
+              <Link href="/admin/posts/new" className="admin-link">
+                Write your first post →
+              </Link>
+            }
+          />
+        ) : (
+          <div className="admin-position-list">
+            {recentPosts.map((p) => (
+              <Link
+                href={`/admin/posts/${p._id}`}
+                className="admin-position-row"
+                key={p._id}
+              >
+                <div
+                  className="admin-position-icon"
+                  style={{ background: "#6366f11a", color: "#6366f1" }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </div>
+                <div className="admin-position-main">
+                  <strong>{p.title || "(untitled)"}</strong>
+                  <span>{p.category} • /{p.slug}</span>
+                </div>
+                <div className="admin-app-right">
+                  <span className="admin-app-date">{formatDateTime(p.updatedAt)}</span>
+                  <StatusBadge status={p.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,13 @@ import connectDB from "../../../lib/mongodb";
 import Admin from "../../../lib/models/Admin";
 import { signToken, setSessionCookie } from "../../../lib/auth";
 import { withTimeout } from "../../../lib/db";
+import {
+  loginRateCheck,
+  recordLoginFailure,
+  clearLoginFailures,
+  generateCsrfToken,
+  setCsrfCookie,
+} from "../../../lib/security";
 
 export async function POST(request) {
   let body;
@@ -22,6 +29,16 @@ export async function POST(request) {
     return Response.json(
       { success: false, message: "Email and password are required." },
       { status: 400 }
+    );
+  }
+
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const rateKey = `${ip}:${email}`;
+  const rate = loginRateCheck(rateKey);
+  if (!rate.ok) {
+    return Response.json(
+      { success: false, message: `Too many login attempts. Please try again in ${Math.ceil(rate.retryAfterMs / 60000)} minutes.` },
+      { status: 429 }
     );
   }
 
@@ -45,6 +62,7 @@ export async function POST(request) {
   if (adminDoc) {
     const ok = await bcrypt.compare(password, adminDoc.passwordHash);
     if (!ok) {
+      recordLoginFailure(rateKey);
       return Response.json(
         { success: false, message: "Invalid email or password." },
         { status: 401 }
@@ -76,6 +94,7 @@ export async function POST(request) {
       adminDoc = { _id: "env-bootstrap", email, name: "Admin" };
     }
   } else {
+    recordLoginFailure(rateKey);
     return Response.json(
       { success: false, message: "Invalid email or password." },
       { status: 401 }
@@ -89,15 +108,20 @@ export async function POST(request) {
     ).catch(() => {});
   }
 
+  clearLoginFailures(rateKey);
+
   try {
     const token = await signToken(adminDoc);
     await setSessionCookie(token);
+    const csrfToken = generateCsrfToken();
+    await setCsrfCookie(csrfToken);
 
     const now = new Date();
 
     return Response.json({
       success: true,
       message: "Logged in successfully.",
+      csrfToken,
       admin: {
         id: String(adminDoc._id),
         name: adminDoc.name || "Admin",
