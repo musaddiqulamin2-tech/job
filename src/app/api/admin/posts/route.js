@@ -9,6 +9,12 @@ import {
   slugExists,
 } from "../../../lib/cms";
 import { validateContentJson, jsonToHtml, createEmptyDoc } from "../../../lib/postRender";
+import {
+  log as liveLog,
+  activity as liveActivity,
+  emitEvent,
+  bumpStats,
+} from "../../../lib/liveServer";
 
 export const dynamic = "force-dynamic";
 
@@ -148,9 +154,39 @@ export async function POST(request) {
     payload = applyContent(payload, data, null);
 
     const post = await Post.create(payload);
+
+    emitEvent("content:created", {
+      _id: String(post._id),
+      title: post.title,
+      status: post.status,
+    });
+    if (post.status === "published") {
+      emitEvent("content:published", { _id: String(post._id), title: post.title });
+      liveLog({ level: "SUCCESS", source: "PostsAPI", message: `Post published: ${post.title}` });
+      liveActivity({
+        tone: "postPublished",
+        message: "New post published",
+        sub: post.title,
+        id: String(post._id),
+        link: `/admin/posts/${post._id}`,
+      });
+      emitEvent("notify", { tone: "job", message: `New post published: ${post.title}` });
+    } else {
+      liveLog({ level: "INFO", source: "PostsAPI", message: `Post created (${post.status}): ${post.title}` });
+      liveActivity({
+        tone: "postCreated",
+        message: "Post created",
+        sub: post.title,
+        id: String(post._id),
+        link: `/admin/posts/${post._id}`,
+      });
+    }
+    bumpStats();
+
     return Response.json({ success: true, post: { ...post.toObject(), _id: String(post._id) } }, { status: 201 });
   } catch (error) {
     console.error("Admin create post error:", error.message);
+    liveLog({ level: "ERROR", source: "PostsAPI", message: `Admin create post failed: ${error.message}` });
     if (isDbError(error)) return dbUnavailable();
     return Response.json({ success: false, message: "Failed to save post." }, { status: 500 });
   }
@@ -182,6 +218,9 @@ export async function PATCH(request) {
 
     if (action === "delete") {
       const r = await Post.deleteMany({ _id: { $in: ids } });
+      liveLog({ level: "INFO", source: "PostsAPI", message: `Bulk deleted ${r.deletedCount} post(s)` });
+      liveActivity({ tone: "postDeleted", message: "Bulk posts deleted", sub: `${r.deletedCount} post(s)` });
+      bumpStats();
       return Response.json({ success: true, deleted: r.deletedCount });
     }
 
@@ -200,6 +239,14 @@ export async function PATCH(request) {
     }
 
     const r = await Post.updateMany({ _id: { $in: ids } }, { $set: set });
+    emitEvent("content:updated", { ids, action, modified: r.modifiedCount });
+    liveLog({ level: "INFO", source: "PostsAPI", message: `Bulk action '${action}' applied to ${r.modifiedCount} post(s)` });
+    liveActivity({
+      tone: action === "publish" ? "postPublished" : "postUpdated",
+      message: action === "publish" ? "Posts published" : `Posts ${action}`,
+      sub: `${r.modifiedCount} post(s)`,
+    });
+    bumpStats();
     return Response.json({ success: true, modified: r.modifiedCount });
   } catch (error) {
     console.error("Admin bulk post error:", error.message);
@@ -231,6 +278,9 @@ export async function DELETE(request) {
   try {
     await withTimeout(connectDB());
     const r = await Post.deleteMany({ _id: { $in: ids } });
+    liveLog({ level: "INFO", source: "PostsAPI", message: `Bulk deleted ${r.deletedCount} post(s)` });
+    liveActivity({ tone: "postDeleted", message: "Bulk posts deleted", sub: `${r.deletedCount} post(s)` });
+    bumpStats();
     return Response.json({ success: true, deleted: r.deletedCount });
   } catch (error) {
     console.error("Admin bulk delete posts error:", error.message);

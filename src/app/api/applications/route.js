@@ -2,6 +2,14 @@ import connectDB from "../../lib/mongodb";
 import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import { getSession, unauthorized } from "../../lib/auth";
+import {
+  log as liveLog,
+  activity as liveActivity,
+  emitEvent,
+  trackApiCall,
+  trackVisitor,
+  bumpStats,
+} from "../../lib/liveServer";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -69,6 +77,8 @@ const Application =
   mongoose.model("Application", applicationSchema);
 
 export async function POST(request) {
+  const start = Date.now();
+  trackVisitor(request);
   try {
     await connectDB();
 
@@ -116,6 +126,27 @@ export async function POST(request) {
       status: "Pending",
     });
 
+    emitEvent("application:created", {
+      _id: String(application._id),
+      jobTitle: application.jobTitle,
+      fullName: application.fullName,
+    });
+    liveLog({
+      level: "SUCCESS",
+      source: "ApplicationsAPI",
+      message: `New application received${application.jobTitle ? ` for ${application.jobTitle}` : ""}`,
+    });
+    liveActivity({
+      tone: "appCreated",
+      message: "Application submitted",
+      sub: application.jobTitle || application.fullName || "New application",
+      id: String(application._id),
+      link: `/admin/applications/${application._id}`,
+    });
+    emitEvent("notify", { tone: "application", message: "New application received" });
+    bumpStats();
+
+    trackApiCall({ method: "POST", path: "/api/applications", status: 201, ms: Date.now() - start });
     return Response.json(
       {
         success: true,
@@ -126,7 +157,8 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error("Application Error:", error);
-
+    liveLog({ level: "ERROR", source: "ApplicationsAPI", message: `Application submission failed: ${error.message}` });
+    trackApiCall({ method: "POST", path: "/api/applications", status: 500, ms: Date.now() - start });
     return Response.json(
       {
         success: false,

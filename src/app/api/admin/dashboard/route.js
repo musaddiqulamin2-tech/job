@@ -4,6 +4,7 @@ import Job from "../../../lib/models/Job";
 import { getSession, unauthorized } from "../../../lib/auth";
 import { withTimeout, dbUnavailable } from "../../../lib/db";
 import { jobStatus } from "../../../lib/admin";
+import { trackApiCall } from "../../../lib/liveServer";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ function formatDate(date) {
 export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
+  const start = Date.now();
 
   const now = new Date();
   const weekStart = new Date(now);
@@ -84,7 +86,7 @@ export async function GET() {
       percent: jobTotals ? Math.round((j.count / jobTotals) * 100) : 0,
     }));
 
-    return Response.json({
+    const res = Response.json({
       success: true,
       stats: {
         totalApplications,
@@ -112,8 +114,11 @@ export async function GET() {
         createdAt: job.createdAt,
       })),
     });
+    trackApiCall({ method: "GET", path: "/api/admin/dashboard", status: 200, ms: Date.now() - start });
+    return res;
   } catch (error) {
     console.error("Admin dashboard error:", error.message);
+    trackApiCall({ method: "GET", path: "/api/admin/dashboard", status: 503, ms: Date.now() - start });
     return dbUnavailable();
   }
 }

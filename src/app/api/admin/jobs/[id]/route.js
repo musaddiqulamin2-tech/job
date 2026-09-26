@@ -3,6 +3,12 @@ import Job from "../../../../lib/models/Job";
 import { getSession, unauthorized } from "../../../../lib/auth";
 import { withTimeout, dbUnavailable, isDbError } from "../../../../lib/db";
 import { jobStatus, JOB_STATUSES } from "../../../../lib/admin";
+import {
+  log as liveLog,
+  activity as liveActivity,
+  emitEvent,
+  bumpStats,
+} from "../../../../lib/liveServer";
 
 export const dynamic = "force-dynamic";
 
@@ -87,13 +93,25 @@ export async function PUT(request, { params }) {
         { status: 404 }
       );
     }
-    return Response.json({
+    const res = Response.json({
       success: true,
       job: { ...job.toObject(), _id: String(job._id), status: jobStatus(job) },
       message: "Job updated successfully.",
     });
+    emitEvent("job:updated", { _id: String(job._id), title: job.title, company: job.company });
+    liveLog({ level: "INFO", source: "JobsAPI", message: `Job updated: ${job.title}` });
+    liveActivity({
+      tone: "jobUpdated",
+      message: "Admin updated job",
+      sub: job.title,
+      id: String(job._id),
+      link: `/admin/jobs/${job._id}`,
+    });
+    bumpStats();
+    return res;
   } catch (error) {
     console.error("Admin update job error:", error.message);
+    liveLog({ level: "ERROR", source: "JobsAPI", message: `Admin update job failed: ${error.message}` });
     if (isDbError(error)) return dbUnavailable();
     return Response.json(
       { success: false, message: "Failed to update job." },
@@ -117,9 +135,19 @@ export async function DELETE(_request, { params }) {
         { status: 404 }
       );
     }
+    emitEvent("job:deleted", { _id: String(job._id), title: job.title });
+    liveLog({ level: "INFO", source: "JobsAPI", message: `Job deleted: ${job.title}` });
+    liveActivity({
+      tone: "jobDeleted",
+      message: "Admin deleted job",
+      sub: job.title,
+      id: String(job._id),
+    });
+    bumpStats();
     return Response.json({ success: true, message: "Job deleted." });
   } catch (error) {
     console.error("Admin delete job error:", error.message);
+    liveLog({ level: "ERROR", source: "JobsAPI", message: `Admin delete job failed: ${error.message}` });
     if (isDbError(error)) return dbUnavailable();
     return Response.json(
       { success: false, message: "Failed to delete job." },

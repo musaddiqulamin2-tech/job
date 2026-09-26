@@ -3,6 +3,7 @@ import Application from "../../../lib/models/Application";
 import { getSession, unauthorized } from "../../../lib/auth";
 import { withTimeout, dbUnavailable } from "../../../lib/db";
 import { APP_STATUSES } from "../../../lib/admin";
+import { trackApiCall } from "../../../lib/liveServer";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export async function GET(request) {
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const start = Date.now();
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") || "";
   const status = searchParams.get("status") || "";
@@ -45,7 +47,7 @@ export async function GET(request) {
         .lean(),
     ]);
 
-    return Response.json({
+    const res = Response.json({
       success: true,
       applications: applications.map((app) => ({
         ...app,
@@ -56,8 +58,12 @@ export async function GET(request) {
       page,
       totalPages: Math.ceil(total / limit),
     });
+    trackApiCall({ method: "GET", path: "/api/admin/applications", status: 200, ms: Date.now() - start });
+    return res;
   } catch (error) {
     console.error("Admin applications list error:", error.message);
-    return dbUnavailable();
+    const res = dbUnavailable();
+    trackApiCall({ method: "GET", path: "/api/admin/applications", status: 503, ms: Date.now() - start });
+    return res;
   }
 }

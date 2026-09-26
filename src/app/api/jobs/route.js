@@ -2,6 +2,7 @@ import connectDB from "../../lib/mongodb";
 import Job from "../../lib/models/Job";
 import { getSampleJobs } from "../../lib/categoryData";
 import { getSession, unauthorized } from "../../lib/auth";
+import { trackVisitor, trackApiCall, log as liveLog } from "../../lib/liveServer";
 
 const DB_TIMEOUT_MS = 2000;
 
@@ -67,6 +68,8 @@ function searchStaticJobs(q, location, category) {
 }
 
 export async function GET(request) {
+  const start = Date.now();
+  trackVisitor(request);
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   const { q, location, category } = Object.fromEntries(searchParams);
@@ -76,14 +79,17 @@ export async function GET(request) {
       await withTimeout(connectDB(), DB_TIMEOUT_MS);
       const job = await Job.findById(id);
       if (!job) {
+        trackApiCall({ method: "GET", path: "/api/jobs", status: 404, ms: Date.now() - start });
         return Response.json(
           { success: false, message: "Job not found" },
           { status: 404 }
         );
       }
+      trackApiCall({ method: "GET", path: "/api/jobs", status: 200, ms: Date.now() - start });
       return Response.json({ success: true, job });
     } catch (err) {
       const job = getSampleJobs().find((j) => j._id === id || j.slug === id);
+      trackApiCall({ method: "GET", path: "/api/jobs", status: job ? 200 : 404, ms: Date.now() - start });
       if (!job) {
         return Response.json(
           { success: false, message: "Job not found" },
@@ -136,11 +142,13 @@ export async function GET(request) {
       console.error("Get CMS posts Error:", cmsErr.message);
     }
 
+    trackApiCall({ method: "GET", path: "/api/jobs", status: 200, ms: Date.now() - start });
     return Response.json({ success: true, jobs, cmsPosts, cmsCount: cmsPosts.length });
   } catch (error) {
     if (error.message !== "db-timeout") {
       console.error("Get Jobs Error:", error);
     }
+    trackApiCall({ method: "GET", path: "/api/jobs", status: 200, ms: Date.now() - start });
     return Response.json({ success: true, jobs: searchStaticJobs(q, location, category), cmsPosts: [], cmsCount: 0 });
   }
 }

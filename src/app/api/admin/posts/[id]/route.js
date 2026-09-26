@@ -5,6 +5,12 @@ import { withTimeout, dbUnavailable, isDbError } from "../../../../lib/db";
 import { verifyCsrf } from "../../../../lib/security";
 import { validatePostInput, cleanPostPayload, slugExists } from "../../../../lib/cms";
 import { validateContentJson, jsonToHtml, createEmptyDoc } from "../../../../lib/postRender";
+import {
+  log as liveLog,
+  activity as liveActivity,
+  emitEvent,
+  bumpStats,
+} from "../../../../lib/liveServer";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +115,17 @@ export async function PUT(request, { params }) {
     Object.assign(existing, payload);
     await existing.save();
 
+    emitEvent("content:updated", { _id: String(existing._id), title: existing.title, status: existing.status });
+    liveLog({ level: "INFO", source: "PostsAPI", message: `Post updated: ${existing.title}` });
+    liveActivity({
+      tone: existing.status === "published" ? "postPublished" : "postUpdated",
+      message: "Post updated",
+      sub: existing.title,
+      id: String(existing._id),
+      link: `/admin/posts/${existing._id}`,
+    });
+    bumpStats();
+
     return Response.json({
       success: true,
       message: "Post updated.",
@@ -116,6 +133,7 @@ export async function PUT(request, { params }) {
     });
   } catch (error) {
     console.error("Admin update post error:", error.message);
+    liveLog({ level: "ERROR", source: "PostsAPI", message: `Admin update post failed: ${error.message}` });
     if (isDbError(error)) return dbUnavailable();
     return Response.json({ success: false, message: "Failed to update post." }, { status: 500 });
   }
@@ -136,9 +154,19 @@ export async function DELETE(request, { params }) {
     if (!deleted) {
       return Response.json({ success: false, message: "Post not found." }, { status: 404 });
     }
+    emitEvent("content:deleted", { _id: String(deleted._id), title: deleted.title });
+    liveLog({ level: "INFO", source: "PostsAPI", message: `Post deleted: ${deleted.title}` });
+    liveActivity({
+      tone: "postDeleted",
+      message: "Post deleted",
+      sub: deleted.title,
+      id: String(deleted._id),
+    });
+    bumpStats();
     return Response.json({ success: true, message: "Post deleted." });
   } catch (error) {
     console.error("Admin delete post error:", error.message);
+    liveLog({ level: "ERROR", source: "PostsAPI", message: `Admin delete post failed: ${error.message}` });
     if (isDbError(error)) return dbUnavailable();
     return Response.json({ success: false, message: "Failed to delete post." }, { status: 500 });
   }

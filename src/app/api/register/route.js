@@ -2,6 +2,14 @@ import connectDB from "../../lib/mongodb";
 import mongoose from "mongoose";
 import { v2 as cloudinary } from "cloudinary";
 import Worker from "../../lib/models/Worker";
+import {
+  log as liveLog,
+  activity as liveActivity,
+  emitEvent,
+  trackApiCall,
+  trackVisitor,
+  bumpStats,
+} from "../../lib/liveServer";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,6 +18,8 @@ cloudinary.config({
 });
 
 export async function POST(request) {
+  const start = Date.now();
+  trackVisitor(request);
   try {
     await connectDB();
 
@@ -48,6 +58,23 @@ export async function POST(request) {
       documentUrl,
     });
 
+    emitEvent("user:created", { _id: String(worker._id), name: worker.name });
+    liveLog({
+      level: "SUCCESS",
+      source: "UsersAPI",
+      message: `New user registered: ${worker.name}`,
+    });
+    liveActivity({
+      tone: "userRegistered",
+      message: "New user registered",
+      sub: worker.name,
+      id: String(worker._id),
+      link: "/admin/users",
+    });
+    emitEvent("notify", { tone: "user", message: "New user registered" });
+    bumpStats();
+
+    trackApiCall({ method: "POST", path: "/api/register", status: 201, ms: Date.now() - start });
     return Response.json(
       {
         success: true,
@@ -58,7 +85,8 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error("Register Error:", error);
-
+    liveLog({ level: "ERROR", source: "UsersAPI", message: `Registration failed: ${error.message}` });
+    trackApiCall({ method: "POST", path: "/api/register", status: 500, ms: Date.now() - start });
     return Response.json(
       {
         success: false,

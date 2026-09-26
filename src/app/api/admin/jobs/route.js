@@ -3,6 +3,13 @@ import Job from "../../../lib/models/Job";
 import { getSession, unauthorized } from "../../../lib/auth";
 import { withTimeout, dbUnavailable, isDbError } from "../../../lib/db";
 import { jobStatus, JOB_STATUSES } from "../../../lib/admin";
+import {
+  log as liveLog,
+  activity as liveActivity,
+  emitEvent,
+  trackApiCall,
+  bumpStats,
+} from "../../../lib/liveServer";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +51,7 @@ export async function GET(request) {
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const start = Date.now();
   const { searchParams } = new URL(request.url);
   const params = {
     q: searchParams.get("q") || "",
@@ -69,16 +77,21 @@ export async function GET(request) {
         .lean(),
     ]);
 
-    return Response.json({
+    const res = Response.json({
       success: true,
       jobs: jobs.map((job) => ({ ...job, _id: String(job._id), status: jobStatus(job) })),
       total,
       page,
       totalPages: Math.ceil(total / limit),
     });
+    trackApiCall({ method: "GET", path: "/api/admin/jobs", status: 200, ms: Date.now() - start });
+    return res;
   } catch (error) {
     console.error("Admin jobs list error:", error.message);
-    return dbUnavailable();
+    liveLog({ level: "ERROR", source: "JobsAPI", message: `Admin jobs list failed: ${error.message}` });
+    const res = dbUnavailable();
+    trackApiCall({ method: "GET", path: "/api/admin/jobs", status: 503, ms: Date.now() - start });
+    return res;
   }
 }
 
@@ -168,12 +181,38 @@ export async function POST(request) {
       officialLink: clean.officialLink || "",
     });
 
+    const actor = session?.email || "admin";
+    emitEvent("job:created", {
+      _id: String(job._id),
+      title: job.title,
+      company: job.company,
+    });
+    liveLog({
+      level: clean.status === "Active" ? "SUCCESS" : "INFO",
+      source: "JobsAPI",
+      message: clean.status === "Active"
+        ? `New job posted: ${job.title} (${job.company})`
+        : `New job created (${clean.status}): ${job.title}`,
+    });
+    liveActivity({
+      tone: "jobCreated",
+      message: "New job posted",
+      sub: job.title,
+      id: String(job._id),
+      link: `/admin/jobs/${job._id}`,
+    });
+    bumpStats();
+    if (clean.status === "Active") {
+      emitEvent("notify", { tone: "job", message: `New job published: ${job.title}` });
+    }
+
     return Response.json(
       { success: true, job: { ...job.toObject(), _id: String(job._id) }, message: "Job created successfully." },
       { status: 201 }
     );
   } catch (error) {
     console.error("Admin create job error:", error.message);
+    liveLog({ level: "ERROR", source: "JobsAPI", message: `Admin create job failed: ${error.message}` });
     if (isDbError(error)) return dbUnavailable();
     return Response.json(
       { success: false, message: "Failed to create job." },
