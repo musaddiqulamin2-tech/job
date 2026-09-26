@@ -1,0 +1,11 @@
+{
+  "name": "job-career",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root wrapper so Render's default build/start (run at repo root) delegates to the backend service.",
+  "scripts": {
+    "postinstall": "cd backend && npm install",
+    "build": "cd backend && npm run build",
+    "start": "cd backend && npm start"
+  }
+}
