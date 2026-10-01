@@ -142,6 +142,7 @@ export default function PostEditor({ postId = null, initial = null }) {
     ],
     content: initial?.content?.json && initial.content.json.type === "doc" ? initial.content.json : createEmptyDoc(),
     editorProps: { attributes: { class: "t-prose t-editor-box" } },
+    immediatelyRender: false,
   });
 
   function toastMsg(type, message) {
@@ -355,7 +356,7 @@ export default function PostEditor({ postId = null, initial = null }) {
       </div>
 
       <div className="admin-card t-card">
-        {tab === "content" && (
+        <div hidden={tab !== "content"}>
           <div className="t-section">
             <div className="admin-form-group t-field">
               <label htmlFor="f-title">Title *</label>
@@ -432,19 +433,25 @@ export default function PostEditor({ postId = null, initial = null }) {
             </div>
 
             <div className="t-editor">
-              <ActionBar
-                editor={editor}
-                onInsertTemplate={insertTemplate}
-                onUploadImage={() => triggerUpload("editor")}
-                onSetLink={setLinkUrl}
-                onInsertTable={insertTable}
-              />
-              <EditorContent editor={editor} />
+              {editor ? (
+                <>
+                  <ActionBar
+                    editor={editor}
+                    onInsertTemplate={insertTemplate}
+                    onUploadImage={() => triggerUpload("editor")}
+                    onSetLink={setLinkUrl}
+                    onInsertTable={insertTable}
+                  />
+                  <EditorContent editor={editor} />
+                </>
+              ) : (
+                <div className="t-editor-loading">Loading editor...</div>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
-        {tab === "job" && (
+        <div hidden={tab !== "job"}>
           <div className="t-section">
             <h3 className="t-section-title">Job / Notification Details</h3>
             <div className="admin-form-row t-row2">
@@ -540,9 +547,9 @@ export default function PostEditor({ postId = null, initial = null }) {
               + Add Important Link
             </button>
           </div>
-        )}
+        </div>
 
-        {tab === "seo" && (
+        <div hidden={tab !== "seo"}>
           <div className="t-section">
             <h3 className="t-section-title">SEO Settings</h3>
             <div className="admin-form-group t-field">
@@ -580,15 +587,15 @@ export default function PostEditor({ postId = null, initial = null }) {
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {tab === "preview" && (
+        <div hidden={tab !== "preview"}>
           <div className="t-section">
             <h3 className="t-section-title">Live Preview</h3>
             <p className="admin-field-hint">This is how the post will render on the public website (same sanitized HTML).</p>
             <div className="t-preview" dangerouslySetInnerHTML={{ __html: previewHtml || "<p>No content yet.</p>" }} />
           </div>
-        )}
+        </div>
       </div>
 
       <div className="t-savebar">
