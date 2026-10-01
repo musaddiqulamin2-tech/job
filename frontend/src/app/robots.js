@@ -5,6 +5,6 @@ export default function robots() {
       allow: "/",
       disallow: ["/admin", "/api/", "/draft"],
     },
-    sitemap: `${process.env.SITE_URL || "https://jobcareer.in"}/sitemap.xml`,
+    sitemap: `${process.env.SITE_URL || "https://jobcareercanvas.in"}/sitemap.xml`,
   };
 }
