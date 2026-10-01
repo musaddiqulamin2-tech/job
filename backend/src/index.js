@@ -48,7 +48,10 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "2mb" }));
+// Media uploads arrive as base64 data URLs inside a JSON body, which inflates
+// the file by ~4/3. The media route accepts 8 MB images and 20 MB PDFs, so the
+// JSON limit has to be larger than that or the body parser rejects the upload.
+app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
 // --- auto-mount every route.js under src/routes as an Express router ---
@@ -111,9 +114,15 @@ app.use((req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error("Unhandled error:", err);
-  if (!res.headersSent) {
-    res.status(500).json({ success: false, message: "Internal server error." });
+  if (res.headersSent) return;
+  if (err?.type === "entity.too.large" || err?.status === 413) {
+    return res.status(413).json({ success: false, message: "File is too large to upload. Maximum is 8 MB for images and 20 MB for PDFs." });
   }
+  if (err?.type === "entity.parse.failed") {
+    return res.status(400).json({ success: false, message: "Invalid request body." });
+  }
+  const status = err?.status && err.status >= 400 && err.status < 500 ? err.status : 500;
+  res.status(status).json({ success: false, message: "Internal server error." });
 });
 
 connectDB()
