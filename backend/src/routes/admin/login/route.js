@@ -69,18 +69,12 @@ export async function POST(request) {
     dbReachable = false;
   }
 
-  if (adminDoc) {
-    const ok = await bcrypt.compare(password, adminDoc.passwordHash);
-    if (!ok) {
-      recordLoginFailure(rateKey);
-      liveLog({ level: "WARN", source: "AuthAPI", message: "Admin login failed (invalid password)" });
-      trackApiCall({ method: "POST", path: "/api/admin/login", status: 401, ms: Date.now() - start });
-      return Response.json(
-        { success: false, message: "Invalid email or password." },
-        { status: 401 }
-      );
-    }
-  } else if (envMatch) {
+  let authOk = false;
+  if (adminDoc && adminDoc.passwordHash) {
+    authOk = await bcrypt.compare(password, adminDoc.passwordHash);
+  }
+  if (!authOk && envMatch) {
+    authOk = true;
     if (dbReachable) {
       try {
         const passwordHash = await bcrypt.hash(password, 10);
@@ -105,9 +99,11 @@ export async function POST(request) {
     } else {
       adminDoc = { _id: "env-bootstrap", email, name: "Admin" };
     }
-  } else {
+  }
+
+  if (!authOk) {
     recordLoginFailure(rateKey);
-    liveLog({ level: "WARN", source: "AuthAPI", message: "Admin login failed (unknown account)" });
+    liveLog({ level: "WARN", source: "AuthAPI", message: "Admin login failed (invalid email or password)" });
     trackApiCall({ method: "POST", path: "/api/admin/login", status: 401, ms: Date.now() - start });
     return Response.json(
       { success: false, message: "Invalid email or password." },
