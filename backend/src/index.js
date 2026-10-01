@@ -19,21 +19,32 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .map((s) => s.trim())
   .filter(Boolean);
 
+function originAllowed(origin) {
+  if (
+    !origin ||
+    allowedOrigins.length === 0 ||
+    allowedOrigins.includes(origin) ||
+    origin.startsWith("http://localhost") ||
+    origin.startsWith("http://127.0.0.1") ||
+    origin.endsWith(".vercel.app") ||
+    origin.endsWith("jobcareercanvas.in")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, cb) {
-      if (
-        !origin ||
-        allowedOrigins.length === 0 ||
-        allowedOrigins.includes(origin) ||
-        origin.startsWith("http://localhost") ||
-        origin.startsWith("http://127.0.0.1")
-      ) {
+      if (originAllowed(origin)) {
         return cb(null, true);
       }
       return cb(null, false);
     },
     credentials: false,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
