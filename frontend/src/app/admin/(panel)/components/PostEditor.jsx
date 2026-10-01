@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -110,9 +110,26 @@ function templateDoc() {
   };
 }
 
+function Field({ id, label, value, onChange, error, placeholder = "", textarea = false, hint, rows = 2 }) {
+  const cls = error ? "admin-input admin-input-error" : "";
+  return (
+    <div className="admin-form-group t-field">
+      <label htmlFor={id}>{label}</label>
+      {textarea ? (
+        <textarea id={id} rows={rows} className={cls} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      ) : (
+        <input id={id} type="text" className={cls} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+      )}
+      {error && <span className="admin-field-error">{error}</span>}
+      {hint && <small className="admin-field-hint">{hint}</small>}
+    </div>
+  );
+}
+
 export default function PostEditor({ postId = null, initial = null }) {
   const router = useRouter();
   const fileInput = useRef(null);
+  const slugTouched = useRef(Boolean(initial?.slug));
   const [tab, setTab] = useState("content");
   const [savingAction, setSavingAction] = useState("");
   const [toast, setToast] = useState(null);
@@ -120,8 +137,16 @@ export default function PostEditor({ postId = null, initial = null }) {
   const [form, setForm] = useState(() => formFrom(initial));
   const [seo, setSeo] = useState(() => seoFrom(initial));
 
-  const editor = useEditor({
-    extensions: [
+  const initialContent = useMemo(
+    () =>
+      initial?.content?.json && initial.content.json.type === "doc"
+        ? initial.content.json
+        : createEmptyDoc(),
+    [initial]
+  );
+
+  const editorExtensions = useMemo(
+    () => [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
         link: { openOnClick: false, autolink: true, HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" } },
@@ -140,8 +165,18 @@ export default function PostEditor({ postId = null, initial = null }) {
       TextStyle,
       Color,
     ],
-    content: initial?.content?.json && initial.content.json.type === "doc" ? initial.content.json : createEmptyDoc(),
-    editorProps: { attributes: { class: "t-prose t-editor-box" } },
+    []
+  );
+
+  const editorProps = useMemo(
+    () => ({ attributes: { class: "t-prose t-editor-box" } }),
+    []
+  );
+
+  const editor = useEditor({
+    extensions: editorExtensions,
+    content: initialContent,
+    editorProps,
     immediatelyRender: false,
   });
 
@@ -152,15 +187,20 @@ export default function PostEditor({ postId = null, initial = null }) {
 
   function update(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
-    if (errors[key]) setErrors((e) => ({ ...e, [key]: null }));
+    setErrors((e) => (e[key] ? { ...e, [key]: null } : e));
   }
 
   function onTitleChange(value) {
     setForm((f) => {
       const next = { ...f, title: value };
-      if (!f.slug) next.slug = slugify(value);
+      if (!slugTouched.current) next.slug = slugify(value);
       return next;
     });
+  }
+
+  function onSlugChange(value) {
+    slugTouched.current = true;
+    update("slug", slugify(value));
   }
 
   function updateLink(idx, patch) {
@@ -300,18 +340,8 @@ export default function PostEditor({ postId = null, initial = null }) {
 
   const previewHtml = editor && tab === "preview" ? jsonToHtml(editor.getJSON()) : "";
 
-  function Field({ k, label, placeholder = "", textarea = false, hint }) {
-    return (
-      <div className="admin-form-group t-field">
-        <label htmlFor={`f-${k}`}>{label}</label>
-        {textarea ? (
-          <textarea id={`f-${k}`} rows={2} value={form[k]} onChange={(e) => update(k, e.target.value)} placeholder={placeholder} />
-        ) : (
-          <input id={`f-${k}`} type="text" value={form[k]} onChange={(e) => update(k, e.target.value)} placeholder={placeholder} />
-        )}
-        {hint && <small className="admin-field-hint">{hint}</small>}
-      </div>
-    );
+  function field(k, label, extra = {}) {
+    return <Field key={k} id={`f-${k}`} label={label} value={form[k]} error={errors[k]} onChange={(value) => update(k, value)} {...extra} />;
   }
 
   return (
@@ -379,7 +409,7 @@ export default function PostEditor({ postId = null, initial = null }) {
                   type="text"
                   className={errors.slug ? "admin-input admin-input-error" : ""}
                   value={form.slug}
-                  onChange={(e) => update("slug", slugify(e.target.value))}
+                  onChange={(e) => onSlugChange(e.target.value)}
                   placeholder="auto-generated-from-title"
                 />
                 {errors.slug && <span className="admin-field-error">{errors.slug}</span>}
@@ -455,39 +485,39 @@ export default function PostEditor({ postId = null, initial = null }) {
           <div className="t-section">
             <h3 className="t-section-title">Job / Notification Details</h3>
             <div className="admin-form-row t-row2">
-              <Field k="organization" label="Organization / Department" />
-              <Field k="vacancyCount" label="Total Vacancies" />
+              {field("organization", "Organization / Department")}
+              {field("vacancyCount", "Total Vacancies")}
             </div>
             <div className="admin-form-row t-row2">
-              <Field k="location" label="Location" />
-              <Field k="qualification" label="Qualification" textarea />
+              {field("location", "Location")}
+              {field("qualification", "Qualification", { textarea: true })}
             </div>
             <div className="admin-form-row t-row2">
-              <Field k="ageLimit" label="Age Limit" />
-              <Field k="ageRelaxation" label="Age Relaxation" />
+              {field("ageLimit", "Age Limit")}
+              {field("ageRelaxation", "Age Relaxation")}
             </div>
             <div className="admin-form-row t-row2">
-              <Field k="applicationFee" label="Application Fee" />
-              <Field k="paymentMode" label="Payment Mode" />
+              {field("applicationFee", "Application Fee")}
+              {field("paymentMode", "Payment Mode")}
             </div>
-            <Field k="eligibility" label="Detailed Eligibility" textarea hint="Additional eligibility notes beyond qualification." />
-            <Field k="selectionProcess" label="Selection Process" textarea hint="One step per line." />
-            <Field k="howToApply" label="How to Apply (steps)" textarea hint="One step per line." />
+            {field("eligibility", "Detailed Eligibility", { textarea: true, hint: "Additional eligibility notes beyond qualification." })}
+            {field("selectionProcess", "Selection Process", { textarea: true, hint: "One step per line." })}
+            {field("howToApply", "How to Apply (steps)", { textarea: true, hint: "One step per line." })}
             <div className="admin-form-row t-row2">
-              <Field k="startDate" label="Application Start Date" />
-              <Field k="lastDate" label="Last Date" />
-            </div>
-            <div className="admin-form-row t-row2">
-              <Field k="examDate" label="Exam Date" />
-              <Field k="admitCardDate" label="Admit Card Date" />
+              {field("startDate", "Application Start Date")}
+              {field("lastDate", "Last Date")}
             </div>
             <div className="admin-form-row t-row2">
-              <Field k="resultDate" label="Result Date" />
-              <Field k="officialNotificationUrl" label="Notification URL (https://)" />
+              {field("examDate", "Exam Date")}
+              {field("admitCardDate", "Admit Card Date")}
             </div>
             <div className="admin-form-row t-row2">
-              <Field k="applicationUrl" label="Apply Online URL (https://)" />
-              <Field k="tags" label="Tags" hint="Comma separated" />
+              {field("resultDate", "Result Date")}
+              {field("officialNotificationUrl", "Notification URL (https://)")}
+            </div>
+            <div className="admin-form-row t-row2">
+              {field("applicationUrl", "Apply Online URL (https://)")}
+              {field("tags", "Tags", { hint: "Comma separated" })}
             </div>
 
             <div className="admin-form-row t-row2">
