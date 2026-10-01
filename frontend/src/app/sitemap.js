@@ -1,7 +1,7 @@
 import { apiFetch } from "./lib/api";
 import { CMS_LISTING_META } from "./(site)/cms/meta";
 
-const BASE = process.env.SITE_URL || "https://jobcareer.in";
+const BASE = process.env.SITE_URL || "https://jobcareercanvas.in";
 
 export const dynamic = "force-dynamic";
 
