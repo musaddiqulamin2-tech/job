@@ -122,7 +122,7 @@ export async function GET(request) {
     let cmsPosts = [];
     try {
       const { listPublishedPosts } = await import("../../lib/cms.js");
-      const { posts } = await listPublishedPosts({ page: 1, limit: 10 });
+      const { posts } = await listPublishedPosts({ page: 1, limit: 20 });
       cmsPosts = (posts || []).map((p) => ({
         _source: "cms",
         _id: `cms-${p.slug}`,

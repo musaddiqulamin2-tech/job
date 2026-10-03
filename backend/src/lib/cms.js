@@ -83,6 +83,12 @@ function splitTags(value) {
     .slice(0, 20);
 }
 
+function toDateOrNull(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function validatePostInput(data, existingSlug = "") {
   const errors = {};
   const title = String(data.title || "").trim();
@@ -178,6 +184,7 @@ export function cleanPostPayload(data) {
     author,
     tags: splitTags(data.tags),
     featured: Boolean(data.featured),
+    expiresAt: toDateOrNull(data.expiresAt),
     seo: {
       title: String(data.seo?.title || "").trim().slice(0, 200),
       description: String(data.seo?.description || "").trim().slice(0, 300),

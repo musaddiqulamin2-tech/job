@@ -51,6 +51,14 @@ app.use(
 // Media uploads arrive as base64 data URLs inside a JSON body, which inflates
 // the file by ~4/3. The media route accepts 8 MB images and 20 MB PDFs, so the
 // JSON limit has to be larger than that or the body parser rejects the upload.
+// Posts are published at runtime, so browser/CDN caching of a read must never
+// serve a list from before a post was published. The admin panel also re-reads
+// the same endpoints right after a write.
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 

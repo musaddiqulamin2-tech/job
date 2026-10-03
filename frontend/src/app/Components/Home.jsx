@@ -129,7 +129,15 @@ export default function Home() {
         const res = await apiFetch("/api/jobs");
         const data = await res.json();
         if (data.success) {
-          setJobs(data.jobs || []);
+          const submitted = data.jobs || [];
+          const cms = data.cmsPosts || [];
+          setJobs(
+            [...submitted, ...cms].sort(
+              (a, b) =>
+                new Date(b.publishedAt || b.createdAt || 0).getTime() -
+                new Date(a.publishedAt || a.createdAt || 0).getTime()
+            )
+          );
         }
       } catch (error) {
         console.error("Failed to load jobs", error);
@@ -142,6 +150,7 @@ export default function Home() {
 
   const latestRows = jobs.slice(0, 10);
   const updatesRows = jobs.slice(10, 20);
+  const jobHref = (job) => (job._source === "cms" ? `/post/${job.slug}` : `/job/${job._id}`);
   const categories = [
     ...new Set([
       ...jobs.map((j) => j.category).filter(Boolean),
@@ -178,7 +187,7 @@ export default function Home() {
               </div>
             ) : latestRows.length > 0 ? (
               latestRows.map((job) => (
-                <Link className="ja-post-row" href={`/job/${job._id}`} key={job._id}>
+                <Link className="ja-post-row" href={jobHref(job)} key={job._id}>
                   {job.title}
                 </Link>
               ))
@@ -200,7 +209,7 @@ export default function Home() {
               </div>
             ) : updatesRows.length > 0 ? (
               updatesRows.map((job) => (
-                <Link className="ja-post-row" href={`/job/${job._id}`} key={job._id}>
+                <Link className="ja-post-row" href={jobHref(job)} key={job._id}>
                   {job.title}
                 </Link>
               ))
