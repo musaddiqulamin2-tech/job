@@ -75,6 +75,9 @@ export default function PostsPage() {
   async function bulk(action) {
     if (!selected.length) return;
     if (action === "delete" && !window.confirm(`Delete ${selected.length} post(s)? This cannot be undone.`)) return;
+    // Unpublishing removes these posts from every public page, so it needs the
+    // same explicit confirmation as delete.
+    if (action === "unpublish" && !window.confirm(`Unpublish ${selected.length} post(s)? They will disappear from the public website.`)) return;
     setBusy(true);
     try {
       const { res, data } = await apiJson("/api/admin/posts", {
@@ -98,7 +101,15 @@ export default function PostsPage() {
       <div className="admin-page-header">
         <div>
           <h1>All Posts</h1>
-          <p>{total} posts in the content library.</p>
+          {/* Never render a "0 posts" count from the initial state: a failed or
+              in-flight request left total at 0 and made real posts look lost. */}
+          <p>
+            {loading
+              ? "Loading posts..."
+              : error
+                ? "Could not load posts. Check your session and retry."
+                : `${total} posts in the content library.`}
+          </p>
         </div>
         <Link href="/admin/posts/new" className="admin-btn admin-btn-primary">+ New Post</Link>
       </div>
