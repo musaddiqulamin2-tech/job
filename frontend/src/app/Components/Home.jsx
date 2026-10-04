@@ -28,13 +28,7 @@ const SOCIAL_CHANNELS = [
   { label: "Facebook", Icon: FacebookIcon, cls: "ja-soc-fb" },
 ];
 
-const TOP_CATEGORIES = [
-  "Technology",
-  "Engineering",
-  "Design",
-  "Management",
-  "Data Science",
-  "Marketing",
+const FALLBACK_CATEGORIES = [
   "Bank Jobs",
   "Government Jobs",
   "IT Jobs",
@@ -157,7 +151,12 @@ export default function Home() {
   const latestRows = jobs.slice(0, 10);
   const updatesRows = jobs.slice(10, 20);
   const jobHref = (job) => (job._source === "cms" ? `/post/${job.slug}` : `/job/${job._id}`);
-  const categories = TOP_CATEGORIES;
+  const categories = [
+    ...new Set([
+      ...jobs.map((j) => j.category).filter(Boolean),
+      ...FALLBACK_CATEGORIES,
+    ]),
+  ];
 
   return (
     <main className="ja-home">
