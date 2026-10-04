@@ -71,7 +71,8 @@ function BriefcaseIcon() {
 function JobCard({ post, index }) {
   const t = JOB_TYPE_THEME[post.jobType] || AC_THEMES[index % AC_THEMES.length];
   const badge = JOB_BADGE[post.jobType] || "GOVERNMENT";
-  const href = `/job/${post.slug || post._id}`;
+  // Admin-published posts are served by /post/[slug]; submitted rows by /job/[id].
+  const href = post._source === "cms" ? `/post/${post.slug}` : `/job/${post.slug || post._id}`;
 
   return (
     <div className="ac-card jb-card" key={post._id}>
