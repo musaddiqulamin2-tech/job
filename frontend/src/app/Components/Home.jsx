@@ -21,7 +21,12 @@ const FREE_TOOLS = [
 ];
 
 const SOCIAL_CHANNELS = [
-  { label: "WhatsApp Channel", Icon: WhatsAppIcon, cls: "ja-soc-wa" },
+  {
+    label: "WhatsApp Channel",
+    Icon: WhatsAppIcon,
+    cls: "ja-soc-wa",
+    url: "https://whatsapp.com/channel/0029VbE0rPK84Om7jfUDyi47",
+  },
   { label: "YouTube", Icon: YoutubeIcon, cls: "ja-soc-yt" },
   { label: "Telegram", Icon: TelegramIcon, cls: "ja-soc-tg" },
   { label: "Instagram", Icon: InstagramIcon, cls: "ja-soc-ig" },
@@ -162,7 +167,7 @@ export default function Home() {
     <main className="ja-home">
       <div className="ja-home-inner">
         <div className="ja-join-row">
-          <a className="ja-join ja-join-wa" href="https://chat.whatsapp.com/CjdwvyIXjXV2Lg2CG1iUM0" target="_blank" rel="noopener noreferrer">
+          <a className="ja-join ja-join-wa" href="https://whatsapp.com/channel/0029VbE0rPK84Om7jfUDyi47" target="_blank" rel="noopener noreferrer">
             <span className="ja-join-txt">
               <WhatsAppIcon />
               WhatsApp Channel
@@ -267,7 +272,11 @@ export default function Home() {
           <div className="ja-container">
             <h2 className="ja-section-title">Social Media Channels</h2>
             {SOCIAL_CHANNELS.map((s) => (
-              <a className={`ja-widget-row ja-soc-row ${s.cls}`} href="#" key={s.label}>
+              <a
+                className={`ja-widget-row ja-soc-row ${s.cls}`}
+                href={s.url || "#"}
+                key={s.label}
+              >
                 <s.Icon />
                 {s.label}
               </a>
