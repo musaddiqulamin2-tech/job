@@ -276,7 +276,7 @@ export default function Header() {
       <div className="jh-wa-strip">
         <a
           className="jh-wa-strip-link"
-          href="https://chat.whatsapp.com/CjdwvyIXjXV2Lg2CG1iUM0"
+          href="https://whatsapp.com/channel/0029VbE0rPK84Om7jfUDyi47"
           target="_blank"
           rel="noreferrer"
         >
