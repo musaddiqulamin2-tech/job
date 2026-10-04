@@ -1,8 +1,12 @@
 import { apiFetch } from "./api";
-import { getSampleJobs, getJobPage } from "./categoryData";
 
 export const JOB_LIMIT = 12;
 
+const EMPTY_PAGE = { posts: [], total: 0 };
+
+// The Jobs section is fed by the published CMS posts via /api/site/category-jobs.
+// It must never substitute the hardcoded sample list: when there is nothing
+// published the section has to render as empty rather than showing fake jobs.
 export async function loadJobPage(page, limit = JOB_LIMIT) {
   const current = Math.max(1, Number(page) || 1);
   try {
@@ -11,35 +15,27 @@ export async function loadJobPage(page, limit = JOB_LIMIT) {
     );
     if (!res.ok) throw new Error("jobs-unavailable");
     const data = await res.json();
-    if (data.success !== false && Number(data.total) === 0) {
-      return {
-        posts: getJobPage(current, limit),
-        total: getSampleJobs().length,
-      };
-    }
-    return {
-      posts: Array.isArray(data.posts) ? data.posts : getJobPage(current, limit),
-      total: Number(data.total) || (Array.isArray(data.posts) ? data.posts.length : 0),
-    };
+    if (!data || data.success === false) return EMPTY_PAGE;
+    const posts = Array.isArray(data.posts) ? data.posts : [];
+    return { posts, total: Number(data.total) || posts.length };
   } catch {
-    return { posts: getJobPage(current, limit), total: getSampleJobs().length };
+    return EMPTY_PAGE;
   }
 }
 
 export async function loadJobTotal() {
   try {
     const res = await apiFetch(`/api/site/category-jobs?type=job&page=1&limit=1`);
-    if (!res.ok) throw new Error("jobs-unavailable");
+    if (!res.ok) return 0;
     const data = await res.json();
-    const total = Number(data.total) || 0;
-    return total === 0 ? getSampleJobs().length : total;
+    return Number(data.total) || 0;
   } catch {
-    return getSampleJobs().length;
+    return 0;
   }
 }
 
 export function jobTotalPages(totalPostCount) {
-  return Math.max(1, Math.ceil(totalPostCount / JOB_LIMIT));
+  return Math.max(1, Math.ceil((Number(totalPostCount) || 0) / JOB_LIMIT));
 }
 
 export async function loadJob(id) {

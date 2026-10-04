@@ -215,7 +215,7 @@ export default function JobsCategory({ posts, current, total }) {
                 </>
               ) : (
                 <div className="ja-empty">
-                  <p>Unable to load jobs right now. Please try again.</p>
+                  <p>No jobs have been published yet.</p>
                 </div>
               )}
 
