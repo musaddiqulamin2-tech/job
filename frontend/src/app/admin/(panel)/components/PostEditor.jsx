@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -12,6 +12,7 @@ import Highlight from "@tiptap/extension-highlight";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import { createEmptyDoc, jsonToHtml } from "../../../lib/postRender";
 import { POST_CATEGORY_META } from "../../../lib/postMeta";
+import WhatsAppShare from "./WhatsAppShare";
 import { Toast, Spinner } from "./AdminUI";
 import { apiJson, readFileAsDataUrl, slugify, toLocalInputValue } from "./api";
 import { ActionBar } from "./EditorToolbar";
@@ -136,6 +137,13 @@ export default function PostEditor({ postId = null, initial = null }) {
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState(() => formFrom(initial));
   const [seo, setSeo] = useState(() => seoFrom(initial));
+  // The WhatsApp share post is built from the record that is actually saved, so
+  // the generated text always matches what the public site is serving.
+  const [savedPost, setSavedPost] = useState(initial || null);
+
+  useEffect(() => {
+    if (initial) setSavedPost(initial);
+  }, [initial]);
 
   const initialContent = useMemo(
     () =>
@@ -329,6 +337,7 @@ export default function PostEditor({ postId = null, initial = null }) {
         return;
       }
       const savedId = postId || data.post?._id;
+      if (data.post) setSavedPost(data.post);
       setToast({ type: "success", message: res.status === 201 ? "Post created." : "Post saved." });
       window.setTimeout(() => setToast(null), 3000);
       if (!postId && savedId) router.replace(`/admin/posts/${savedId}`);
@@ -357,6 +366,12 @@ export default function PostEditor({ postId = null, initial = null }) {
           <a href={`/post/${form.slug || "preview"}`} target="_blank" rel="noreferrer" className="admin-btn">
             View on Site
           </a>
+          <WhatsAppShare
+            post={savedPost}
+            blockWhenDraft
+            className="admin-btn"
+            label="Share on WhatsApp Channel"
+          />
         </div>
       </div>
 

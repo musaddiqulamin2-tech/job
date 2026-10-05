@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { POST_CATEGORY_META } from "../../../lib/postMeta";
 import { Spinner, EmptyState, ErrorState, Pagination, Toast } from "../components/AdminUI";
+import WhatsAppShare from "../components/WhatsAppShare";
 import { apiJson } from "../components/api";
 
 const STATUS_BADGE = {
@@ -204,6 +205,7 @@ export default function PostsPage() {
                             <div className="t-row-actions">
                               <Link href={`/admin/posts/${p._id}`} className="admin-btn admin-btn-sm">Edit</Link>
                               <a href={`/post/${p.slug}`} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">View</a>
+                              <WhatsAppShare post={p} blockWhenDraft />
                               <button
                                 type="button"
                                 className="admin-btn admin-btn-sm admin-btn-danger"

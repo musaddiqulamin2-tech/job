@@ -12807,3 +12807,102 @@ a.admin-position-row {
   }
 }
 
+
+/* ---------------------------------------------------------
+   WhatsApp Channel share preview (admin only)
+   Scoped to wa-share-* so no existing screen changes.
+   --------------------------------------------------------- */
+.wa-share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.wa-share-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(640px, 100%);
+  max-height: min(86vh, 780px);
+  padding: 20px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+}
+
+.wa-share-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wa-share-heading h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.wa-share-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.wa-share-preview {
+  flex: 1;
+  min-height: 220px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.wa-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wa-share-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .wa-share-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .wa-share-modal {
+    max-height: 92vh;
+    padding: 16px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .wa-share-head {
+    flex-direction: column;
+  }
+
+  .wa-share-actions .admin-btn {
+    flex: 1 1 100%;
+  }
+}
