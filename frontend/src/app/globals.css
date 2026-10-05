@@ -12906,3 +12906,12 @@ a.admin-position-row {
     flex: 1 1 100%;
   }
 }
+
+/* The brand logo image now sits in the badge where the "JC" text used to be.
+   Reusing .admin-logo-badge keeps the existing 40px/44px size and 12px radius
+   from both layout blocks; only the image rendering needs to change. */
+img.admin-logo-badge {
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}

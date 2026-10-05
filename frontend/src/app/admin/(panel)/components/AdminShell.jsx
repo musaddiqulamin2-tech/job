@@ -194,7 +194,12 @@ export default function AdminShell({ children }) {
     <div className="admin-shell">
       <aside className={`admin-sidebar ${open ? "open" : ""}`}>
         <div className="admin-logo">
-          <span className="admin-logo-badge">JC</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="admin-logo-badge"
+            src="/brand/jobcareer-logo.png"
+            alt="JobCareer"
+          />
           <span className="admin-logo-text">
             JobCareer
             <em>Admin Panel</em>

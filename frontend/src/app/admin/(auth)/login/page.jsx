@@ -55,7 +55,12 @@ export default function AdminLogin() {
 
       <div className="admin-login-card">
         <div className="admin-login-brand">
-          <span className="admin-logo-badge">JC</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="admin-logo-badge"
+            src="/brand/jobcareer-logo.png"
+            alt="JobCareer"
+          />
           <span className="admin-logo-text">
             JobCareer
             <em>Admin Panel</em>
