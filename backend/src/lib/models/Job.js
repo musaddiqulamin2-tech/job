@@ -75,6 +75,10 @@ const JobSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    featuredImage: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

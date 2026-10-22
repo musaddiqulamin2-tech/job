@@ -67,6 +67,7 @@ export async function PUT(request, { params }) {
     "posted",
     "lastDate",
     "officialLink",
+    "featuredImage",
   ];
 
   for (const f of stringFields) {

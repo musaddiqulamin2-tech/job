@@ -114,6 +114,7 @@ function cleanPayload(data) {
     "posted",
     "lastDate",
     "officialLink",
+    "featuredImage",
   ];
 
   for (const field of stringFields) {
@@ -179,6 +180,7 @@ export async function POST(request) {
       vacancies: clean.vacancies || 0,
       lastDate: clean.lastDate || "",
       officialLink: clean.officialLink || "",
+      featuredImage: clean.featuredImage || "",
     });
 
     const actor = session?.email || "admin";

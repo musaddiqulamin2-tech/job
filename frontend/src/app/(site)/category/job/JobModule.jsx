@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Pagination from "../../../Components/Pagination";
 import { formatDate } from "../../../lib/categoryData";
+import JobThumbImage from "./JobThumbImage";
 
 export const JOBS_PAGE_DESCRIPTION =
   "Stay updated with the latest government job notifications, recruitment drives, and employment opportunities. Find details on eligibility, application processes, and deadlines to secure your next career opportunity.";
@@ -22,6 +23,23 @@ const JOB_BADGE = {
   "Private Job": "PRIVATE",
   "Teaching Job": "TEACHING",
 };
+
+// Admin-authored CMS posts store their section in "category" and their
+// publisher in "organization", while legacy job rows use "jobType" and
+// "company". Map both onto the card so the label and theme stay truthful.
+const CATEGORY_JOB_TYPE = {
+  "government-job": "Government Job",
+  "private-job": "Private Job",
+};
+
+function jobTypeOf(post) {
+  if (post.jobType) return post.jobType;
+  return CATEGORY_JOB_TYPE[String(post.category || "").toLowerCase()] || "";
+}
+
+function orgOf(post) {
+  return post.org || post.organization || post.company || "JobCareer";
+}
 
 const AC_THEMES = [
   { bg: "#eef2ff", text: "#3730a3", accent: "#4f46e5" },
@@ -69,8 +87,11 @@ function BriefcaseIcon() {
 }
 
 function JobCard({ post, index }) {
-  const t = JOB_TYPE_THEME[post.jobType] || AC_THEMES[index % AC_THEMES.length];
-  const badge = JOB_BADGE[post.jobType] || "GOVERNMENT";
+  const jobType = jobTypeOf(post);
+  const t = JOB_TYPE_THEME[jobType] || AC_THEMES[index % AC_THEMES.length];
+  const badge = JOB_BADGE[jobType] || "GOVERNMENT";
+  const image = post.featuredImage || "";
+  const org = orgOf(post);
   // Admin-published posts are served by /post/[slug]; submitted rows by /job/[id].
   const href = post._source === "cms" ? `/post/${post.slug}` : `/job/${post.slug || post._id}`;
 
@@ -83,11 +104,20 @@ function JobCard({ post, index }) {
         aria-hidden="true"
         style={{ background: t.bg }}
       >
+        {image ? (
+          <JobThumbImage
+            src={image}
+            alt={post.title}
+            org={org}
+            darkText={t.text}
+          />
+        ) : (
+          <span className="ac-card-org" style={{ color: t.text }}>
+            {org}
+          </span>
+        )}
         <span className="ac-card-badge" style={{ backgroundColor: t.accent }}>
           {badge}
-        </span>
-        <span className="ac-card-org" style={{ color: t.text }}>
-          {post.org || post.company || "JobCareer"}
         </span>
         <span className="ac-card-accent" style={{ backgroundColor: t.accent }} />
       </Link>
@@ -104,7 +134,7 @@ function JobCard({ post, index }) {
           </li>
           <li className="jb-meta-item">
             <BriefcaseIcon />
-            <span>{post.jobType || "Government Job"}</span>
+            <span>{jobType || "Government Job"}</span>
           </li>
           <li className="jb-meta-item jb-meta-last">
             <CalendarIcon />

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
+import { apiJson, readFileAsDataUrl } from "./api";
 import { JOB_STATUSES } from "./AdminUI";
 
 const typeOptions = ["Full Time", "Part Time", "Contract", "Internship", "Remote"];
@@ -41,12 +42,15 @@ const empty = {
   vacancies: 0,
   lastDate: "",
   officialLink: "",
+  featuredImage: "",
 };
 
 export default function JobForm({ initial = null, jobId = null }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState("");
   const [form, setForm] = useState(() => ({
     ...empty,
     ...(initial
@@ -60,6 +64,7 @@ export default function JobForm({ initial = null, jobId = null }) {
             : initial.responsibilities || "",
           vacancies: initial.vacancies || 0,
           status: initial.status || "Active",
+          featuredImage: initial.featuredImage || "",
         }
       : {}),
   }));
@@ -70,6 +75,45 @@ export default function JobForm({ initial = null, jobId = null }) {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+  }
+
+  async function handleImageFile(e) {
+    const input = e.target;
+    const file = input.files && input.files[0];
+    input.value = "";
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+      setImageError("Please choose a JPG, PNG, WEBP or GIF image.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setImageError("Image must be under 8 MB.");
+      return;
+    }
+
+    setImageError("");
+    setImageUploading(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const { res, data } = await apiJson("/api/admin/media", {
+        method: "POST",
+        body: { dataUrl, filename: file.name, resourceType: "image" },
+      });
+      if (!res.ok) throw new Error(data?.message || "Upload failed.");
+      const url = data?.item?.secureUrl || data?.item?.url;
+      if (!url) throw new Error("Upload failed.");
+      setForm((prev) => ({ ...prev, featuredImage: url }));
+    } catch (err) {
+      setImageError(err.message || "Upload failed.");
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function handleRemoveImage() {
+    setForm((prev) => ({ ...prev, featuredImage: "" }));
+    setImageError("");
   }
 
   async function handleSubmit(e) {
@@ -100,6 +144,7 @@ export default function JobForm({ initial = null, jobId = null }) {
       vacancies: Number(form.vacancies) || 0,
       lastDate: form.lastDate || "",
       officialLink: form.officialLink || "",
+      featuredImage: form.featuredImage || "",
     };
 
     try {
@@ -273,6 +318,50 @@ export default function JobForm({ initial = null, jobId = null }) {
             onChange={handleChange}
             placeholder="https://example.gov.in/apply"
           />
+        </div>
+
+        <div className="admin-form-group">
+          <label htmlFor="featuredImageFile">Featured Image</label>
+          <div className="t-featured-row">
+            <div className="t-featured-preview">
+              {form.featuredImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.featuredImage} alt="Featured image preview" />
+              ) : (
+                <span>No image uploaded</span>
+              )}
+            </div>
+            <div className="t-featured-actions">
+              <label className="admin-btn admin-btn-primary" htmlFor="featuredImageFile">
+                {imageUploading
+                  ? "Uploading..."
+                  : form.featuredImage
+                    ? "Replace Image"
+                    : "Upload Image"}
+              </label>
+              <input
+                id="featuredImageFile"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleImageFile}
+                style={{ display: "none" }}
+              />
+              {form.featuredImage && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-ghost"
+                  onClick={handleRemoveImage}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="admin-field-hint">
+            JPG, PNG, WEBP or GIF, up to 8 MB. Recommended 1200x675 (16:9). This image is shown on the
+            job listing card.
+          </p>
+          {imageError && <div className="admin-alert admin-alert-error">{imageError}</div>}
         </div>
 
         <div className="admin-form-group">

@@ -228,11 +228,17 @@ export default function AdminJobs() {
                 {jobs.map((job) => (
                   <tr key={job._id}>
                     <td>
-                      <div className="admin-td-title">
-                        <strong>{job.title}</strong>
-                        {job.featured && (
-                          <span className="admin-badge admin-badge-purple">Featured</span>
+                      <div className="t-post-cell">
+                        {job.featuredImage && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={job.featuredImage} alt="" />
                         )}
+                        <div className="admin-td-title">
+                          <strong>{job.title}</strong>
+                          {job.featured && (
+                            <span className="admin-badge admin-badge-purple">Featured</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td>{job.company}</td>
