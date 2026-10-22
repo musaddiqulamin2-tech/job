@@ -300,14 +300,20 @@ export default function CategoryBody({ slug }) {
   const meta = getCategoryMeta(rawSlug);
   const admitPosts = getAdmitCardPosts();
 
-  const [posts, setPosts] = useState(isAdmitCard ? admitPosts : meta.fallbacks);
-  const [loading, setLoading] = useState(isAdmitCard ? false : true);
+  const [posts, setPosts] = useState(isSchemes ? [] : isAdmitCard ? admitPosts : meta.fallbacks);
+  const [loading, setLoading] = useState(isAdmitCard || isSchemes ? false : true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
     setPage(1);
+    if (isSchemes) {
+      setLoading(false);
+      setPosts([]);
+      setLoadFailed(false);
+      return;
+    }
     if (isAdmitCard) {
       setLoading(false);
       setPosts(admitPosts);
@@ -333,6 +339,10 @@ export default function CategoryBody({ slug }) {
     }
     loadCategoryPosts();
   }, [rawSlug, isAdmitCard]);
+
+  if (isSchemes) {
+    return <div className="ja-cat-page site grid-container container hfeed" id="page" />;
+  }
 
   const filteredPosts =
     (isResults || isSchemes || isScholarship) && filter !== "all"
