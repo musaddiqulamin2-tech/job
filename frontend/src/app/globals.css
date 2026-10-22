@@ -12975,6 +12975,70 @@ a.admin-position-row {
   line-height: 1.5;
 }
 
+.wa-poster {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.wa-poster-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wa-poster-title {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wa-poster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.wa-poster-actions .admin-btn.is-active {
+  border-color: #dc2626;
+  background: #fde7e7;
+  color: #991919;
+}
+
+.wa-poster-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  max-height: 420px;
+  overflow: hidden;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.wa-poster-frame img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.wa-poster-placeholder {
+  padding: 24px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 @media (max-width: 640px) {
   .wa-share-overlay {
     padding: 0;
@@ -12993,6 +13057,23 @@ a.admin-position-row {
 
   .wa-share-actions .admin-btn {
     flex: 1 1 100%;
+  }
+
+  .wa-poster-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .wa-poster-actions .admin-btn {
+    flex: 1 1 auto;
+  }
+
+  .wa-poster-frame {
+    max-height: 320px;
+  }
+
+  .wa-poster-frame img {
+    max-height: 320px;
   }
 }
 

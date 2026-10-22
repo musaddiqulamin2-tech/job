@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Toast } from "./AdminUI";
-import { generateJobWhatsAppMessage, whatsAppShareUrl } from "../../../lib/whatsappPost";
+import { clean, generateJobWhatsAppMessage, whatsAppShareUrl } from "../../../lib/whatsappPost";
+import { generateJobPoster } from "../../../lib/jobPoster";
 
-const COPY_OK = "WhatsApp message copied successfully.";
+const COPY_OK = "WhatsApp post copied successfully. Paste it into your channel.";
 const SHARE_OK = "Opening WhatsApp with the generated message…";
 const REGENERATED = "Message regenerated from the saved job details.";
+const POSTER_OK = "Poster downloaded. Attach it to your WhatsApp Channel post.";
+const COPY_IMAGE_OK = "Poster copied. Paste the image into your WhatsApp Channel post.";
 
 async function copyToClipboard(text) {
   try {
@@ -47,10 +50,43 @@ function renderWhatsAppText(text) {
     );
 }
 
+function posterExtension(blob, fallbackUrl) {
+  if (blob?.type === "image/png") return "png";
+  if (blob?.type === "image/webp") return "webp";
+  if (blob?.type === "image/gif") return "gif";
+  const match = String(fallbackUrl || "").match(/\.(png|jpe?g|webp|gif)(?:\?|$)/i);
+  return match ? match[1].toLowerCase().replace("jpeg", "jpg") : "jpg";
+}
+
+async function canvasToPngBlob(blob) {
+  if (!blob || blob.type === "image/png") return blob;
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("decode"));
+      element.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(image, 0, 0);
+    return await new Promise((resolve) => canvas.toBlob((result) => resolve(result), "image/png"));
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 /**
- * WhatsApp job-post generator for one post. The generated message is editable,
- * can be previewed, copied and handed to WhatsApp. It only prepares the text —
- * it never posts to the Channel automatically.
+ * WhatsApp job-post generator for one post. The post has two parts: the poster
+ * image (the saved job image, or a branded poster generated from the same saved
+ * fields) and the message text. Both are previewed, editable where possible and
+ * handed to WhatsApp manually — nothing is published to the Channel here.
  */
 export default function WhatsAppShare({
   post,
@@ -63,11 +99,17 @@ export default function WhatsAppShare({
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [showPreview, setShowPreview] = useState(true);
+  const [posterMode, setPosterMode] = useState("generated");
+  const [posterUrl, setPosterUrl] = useState("");
+  const [posterBusy, setPosterBusy] = useState(false);
+  const [posterError, setPosterError] = useState("");
+  const [posterTick, setPosterTick] = useState(0);
   const [toast, setToast] = useState(null);
   const closeRef = useRef(null);
 
   const generated = post ? generateJobWhatsAppMessage(post) : "";
   const unavailable = !post || !generated;
+  const featuredImage = clean(post?.featuredImage);
   const draftWarning = (warnWhenDraft || blockWhenDraft) && post && post.status !== "published";
 
   useEffect(() => {
@@ -85,22 +127,119 @@ export default function WhatsAppShare({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || posterMode !== "generated") return undefined;
+    let alive = true;
+    setPosterBusy(true);
+    setPosterError("");
+    generateJobPoster(post)
+      .then((url) => {
+        if (!alive) return;
+        if (url) {
+          setPosterUrl(url);
+        } else {
+          setPosterUrl("");
+          setPosterError("The poster could not be generated in this browser.");
+        }
+      })
+      .catch(() => {
+        if (!alive) return;
+        setPosterUrl("");
+        setPosterError("The poster could not be generated in this browser.");
+      })
+      .finally(() => {
+        if (alive) setPosterBusy(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open, posterMode, posterTick, post]);
+
   if (unavailable) return null;
 
   function notify(type, text) {
     setToast({ type, message: text });
-    window.setTimeout(() => setToast(null), 3500);
+    window.setTimeout(() => setToast(null), 4000);
   }
 
   function openEditor() {
     setMessage(generated);
     setShowPreview(true);
+    setPosterMode(featuredImage ? "featured" : "generated");
+    setPosterUrl(featuredImage || "");
+    setPosterError("");
     setOpen(true);
   }
 
   function regenerate() {
     setMessage(generateJobWhatsAppMessage(post));
     notify("success", REGENERATED);
+  }
+
+  function selectFeatured() {
+    setPosterMode("featured");
+    setPosterError("");
+    setPosterUrl(featuredImage);
+  }
+
+  function generatePoster() {
+    setPosterMode("generated");
+    setPosterTick((value) => value + 1);
+  }
+
+  async function posterBlob() {
+    if (!posterUrl) return null;
+    try {
+      const response = await fetch(posterUrl);
+      if (!response.ok) return null;
+      return await response.blob();
+    } catch {
+      return null;
+    }
+  }
+
+  async function downloadPoster() {
+    const blob = await posterBlob();
+    if (!blob) {
+      if (posterUrl) {
+        window.open(posterUrl, "_blank", "noopener,noreferrer");
+        notify("error", "Direct download was blocked. The poster opened in a new tab — save it from there.");
+      } else {
+        notify("error", "Generate or select a poster first.");
+      }
+      return;
+    }
+    const extension = posterExtension(blob, posterUrl);
+    const name = `${post.slug || "job-poster"}-poster.${extension}`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+    notify("success", POSTER_OK);
+  }
+
+  async function copyPoster() {
+    if (!posterUrl) {
+      notify("error", "Generate or select a poster first.");
+      return;
+    }
+    if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+      notify("error", "This browser cannot copy images. Use Download Poster instead.");
+      return;
+    }
+    try {
+      const blob = await posterBlob();
+      const png = await canvasToPngBlob(blob);
+      if (!png) throw new Error("no image");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+      notify("success", COPY_IMAGE_OK);
+    } catch {
+      notify("error", "Could not copy the poster. Use Download Poster instead.");
+    }
   }
 
   async function copy() {
@@ -140,7 +279,10 @@ export default function WhatsAppShare({
             <div className="wa-share-head">
               <div className="wa-share-heading">
                 <h2 id="wa-share-title">WhatsApp Job Post</h2>
-                <p>Edit the message, preview it, then copy it or open WhatsApp to post it to your channel.</p>
+                <p>
+                  Choose or generate the poster, edit the message, preview the post, then copy it or
+                  share it to WhatsApp. Nothing is published automatically.
+                </p>
               </div>
               <button
                 ref={closeRef}
@@ -158,6 +300,66 @@ export default function WhatsAppShare({
                 it.
               </p>
             )}
+
+            <div className="wa-poster">
+              <div className="wa-poster-bar">
+                <span className="wa-poster-title">Generate / Select Job Poster</span>
+                <div className="wa-poster-actions">
+                  {featuredImage && (
+                    <button
+                      type="button"
+                      className={`admin-btn admin-btn-sm${posterMode === "featured" ? " is-active" : ""}`}
+                      aria-pressed={posterMode === "featured"}
+                      onClick={selectFeatured}
+                    >
+                      Use Job Image
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`admin-btn admin-btn-sm${posterMode === "generated" ? " is-active" : ""}`}
+                    aria-pressed={posterMode === "generated"}
+                    onClick={generatePoster}
+                    disabled={posterBusy}
+                  >
+                    {posterMode === "generated" ? "Regenerate Poster" : "Generate Poster"}
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-sm"
+                    onClick={downloadPoster}
+                    disabled={!posterUrl || posterBusy}
+                  >
+                    ⬇ Download Poster
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-sm"
+                    onClick={copyPoster}
+                    disabled={!posterUrl || posterBusy}
+                  >
+                    Copy Poster
+                  </button>
+                </div>
+              </div>
+
+              <div className="wa-poster-frame">
+                {posterBusy ? (
+                  <div className="wa-poster-placeholder">Generating poster…</div>
+                ) : posterUrl ? (
+                  <img src={posterUrl} alt={`${post.title || "Job"} poster`} />
+                ) : (
+                  <div className="wa-poster-placeholder">
+                    {posterError || "No poster image is available for this job."}
+                  </div>
+                )}
+              </div>
+
+              <p className="wa-share-note">
+                WhatsApp cannot attach this image automatically. Download or copy the poster, attach it
+                to your Channel post, then paste the message below.
+              </p>
+            </div>
 
             <div className="wa-share-toolbar">
               <button type="button" className="admin-btn admin-btn-sm" onClick={regenerate}>
@@ -189,7 +391,7 @@ export default function WhatsAppShare({
 
             <div className="wa-share-actions">
               <button type="button" className="admin-btn admin-btn-primary" onClick={copy}>
-                📋 Copy Message
+                📋 Copy Post
               </button>
               <a
                 className="admin-btn"
@@ -203,8 +405,8 @@ export default function WhatsAppShare({
             </div>
 
             <p className="wa-share-note">
-              This only prepares the message. Opening WhatsApp does not publish to your Channel
-              automatically — copy the message and paste it into the Channel to post it.
+              This only prepares the post. Opening WhatsApp does not publish to your Channel
+              automatically — attach the poster, paste the message and publish it manually.
             </p>
           </div>
         </div>

@@ -28,8 +28,7 @@ const BLANK_VALUES = new Set([
   "not specified", "not mentioned",
 ]);
 
-const MAX_SUMMARY_CHARS = 320;
-const MAX_DETAIL_CHARS = 200;
+const MAX_SUMMARY_CHARS = 240;
 
 function blankish(value) {
   const text = String(value).trim().toLowerCase();
@@ -93,12 +92,63 @@ export function jobTypeLabel(category) {
   }
 }
 
+/**
+ * Formats a saved date for display ("2026-11-30" → "30 Nov 2026"). Values that
+ * are not parseable dates are returned untouched, so admin text like "Within 15
+ * days" is never rewritten.
+ */
+export function formatPostDate(value) {
+  const text = clean(value);
+  if (!text) return "";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** Adds the rupee sign only when the admin stored a bare amount. */
+export function formatFee(value) {
+  const text = clean(value);
+  if (!text) return "";
+  return /^\d[\d,.]*$/.test(text) ? `₹${text}` : text;
+}
+
 /** Shortens an over-long field on a word boundary so the post stays readable. */
 function shorten(text, max) {
   if (!text || text.length <= max) return text;
   const clipped = text.slice(0, max);
   const lastSpace = clipped.lastIndexOf(" ");
   return `${(lastSpace > max * 0.6 ? clipped.slice(0, lastSpace) : clipped).trimEnd()}…`;
+}
+
+/**
+ * Keeps whole sentences up to a character limit, so a long admin summary is cut
+ * at a natural break instead of mid-sentence.
+ */
+function firstSentences(text, max) {
+  const value = String(text || "").trim();
+  if (!value) return "";
+  if (value.length <= max) return value;
+  const sentences = value.split(/(?<=[.!?])\s+/).filter(Boolean);
+  let result = "";
+  for (const sentence of sentences) {
+    const next = result ? `${result} ${sentence}` : sentence;
+    if (next.length > max) break;
+    result = next;
+  }
+  return result || shorten(value, max);
+}
+
+/**
+ * Some records store the same name twice ("A/A"). Collapse that exact repeat so
+ * the post and poster show the organization once.
+ */
+export function dedupeRepeated(value) {
+  const text = clean(value);
+  const parts = text.split(/\s*\/\s*/);
+  if (parts.length === 2 && parts[0] && parts[0].toLowerCase() === parts[1].toLowerCase()) {
+    return parts[0];
+  }
+  return text;
 }
 
 /** Year is taken from real post dates, never invented. */
@@ -134,13 +184,13 @@ export function jobHeading(post) {
  */
 export function jobDescription(post) {
   const summary = stripLinks(clean(post?.summary));
-  if (summary) return shorten(summary, MAX_SUMMARY_CHARS);
+  if (summary) return firstSentences(summary, MAX_SUMMARY_CHARS);
 
-  const organization = stripLinks(clean(post?.organization));
+  const organization = stripLinks(dedupeRepeated(post?.organization));
   const location = stripLinks(clean(post?.location));
   const vacancies = clean(post?.vacancyCount);
   const qualification = stripLinks(clean(post?.qualification || post?.eligibility));
-  const lastDate = clean(post?.lastDate);
+  const lastDate = formatPostDate(post?.lastDate);
 
   const sentences = [];
   if (organization && vacancies) {
@@ -159,16 +209,12 @@ export function jobDescription(post) {
   return sentences.join(" ");
 }
 
-function detailLine(emoji, label, value) {
-  const text = stripLinks(clean(value));
-  return text ? `${emoji} *${label}:* ${shorten(text, MAX_DETAIL_CHARS)}` : "";
-}
-
 /**
- * Generates the channel post from the real post record. Every line is
- * conditional, so fields the admin left blank are omitted instead of printing
- * undefined, null or N/A, and the only link in the message is the job's own
- * page on jobcareercanvas.in.
+ * Generates the channel post from the real post record. It follows the channel
+ * style: title, one short description, then the job's own page on
+ * jobcareercanvas.in. The key facts (vacancies, dates, fee) are shown on the
+ * poster image instead of a long text block, so blank fields can never leak
+ * into the message.
  */
 export function generateJobWhatsAppMessage(post) {
   if (!post || typeof post !== "object") return "";
@@ -176,29 +222,20 @@ export function generateJobWhatsAppMessage(post) {
   const heading = jobHeading(post);
   const url = jobPublicUrl(post);
 
-  const details = [
-    detailLine("🏢", "Organization", post.organization),
-    detailLine("👥", "Total Vacancies", post.vacancyCount),
-    detailLine("📍", "Location", post.location),
-    detailLine("🎓", "Qualification", post.qualification || post.eligibility),
-    detailLine("💼", "Job Type", jobTypeLabel(post.category)),
-    detailLine("🎂", "Age Limit", post.ageLimit),
-    detailLine("💳", "Application Fee", post.applicationFee),
-    detailLine("⏰", "Last Date", post.lastDate),
-  ].filter(Boolean);
-
   const blocks = [`🚨 *${heading}*`];
 
   const description = jobDescription(post);
   if (description) blocks.push(description);
 
-  if (details.length) {
-    blocks.push(`*${heading} – Important Details*\n\n${details.join("\n")}`);
-  }
-
   if (url) {
     blocks.push(`🔗 ${url}`);
   }
+
+  // Short description of the website's own job coverage. This describes the
+  // site (not the vacancy), so it never adds unverified recruitment facts.
+  blocks.push(
+    `${SITE_NAME} brings you the latest government and private job notifications with complete details, important dates and official updates.`
+  );
 
   blocks.push(`Follow ${SITE_NAME} for the latest job updates.`);
 

@@ -37,7 +37,10 @@ export async function generateMetadata({ params }) {
     openGraph: {
       title: post.title,
       description: post.seo?.description || post.summary || "",
-      images: post.seo?.image || post.featuredImage || undefined,
+      siteName: "JobCareer Canvas",
+      url: `https://jobcareercanvas.in/post/${slug}`,
+      images:
+        post.seo?.image || post.featuredImage || "https://jobcareercanvas.in/brand/jobcareer-logo.png",
       type: "article",
     },
   };
