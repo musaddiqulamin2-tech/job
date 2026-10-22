@@ -300,7 +300,7 @@ export default function CategoryBody({ slug }) {
   const meta = getCategoryMeta(rawSlug);
   const admitPosts = getAdmitCardPosts();
 
-  const [posts, setPosts] = useState(isAdmitCard ? admitPosts : meta.fallbacks);
+  const [posts, setPosts] = useState(isSchemes ? [] : isAdmitCard ? admitPosts : meta.fallbacks);
   const [loading, setLoading] = useState(isAdmitCard ? false : true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [page, setPage] = useState(1);
@@ -308,6 +308,30 @@ export default function CategoryBody({ slug }) {
 
   useEffect(() => {
     setPage(1);
+    if (isSchemes) {
+      setLoading(true);
+      setLoadFailed(false);
+      async function loadSchemePosts() {
+        try {
+          const res = await apiFetch("/api/site/schemes?limit=100");
+          const data = await res.json();
+          if (data.success && Array.isArray(data.schemes)) {
+            setPosts(data.schemes);
+          } else {
+            setPosts([]);
+            setLoadFailed(true);
+          }
+        } catch (err) {
+          console.error("Error fetching schemes:", err);
+          setPosts([]);
+          setLoadFailed(true);
+        } finally {
+          setLoading(false);
+        }
+      }
+      loadSchemePosts();
+      return;
+    }
     if (isAdmitCard) {
       setLoading(false);
       setPosts(admitPosts);
@@ -739,24 +763,37 @@ export default function CategoryBody({ slug }) {
                             <div className="ac-card sc-card" key={post._id || post.slug || idx}>
                               <Link
                                 href={href}
-                                className="ac-card-thumb"
+                                className="ac-card-thumb sc-card-thumb"
                                 tabIndex={-1}
                                 aria-hidden="true"
                                 style={{ background: t.bg }}
                               >
-                                <span className="sc-cat" style={{ color: t.text }}>
-                                  {post.schemeType}
-                                </span>
-                                <span className="ac-card-org" style={{ color: t.text }}>
-                                  {post.org}
-                                </span>
-                                <span className="ac-card-accent" style={{ backgroundColor: t.accent }} />
+                                {post.featuredImage ? (
+                                  <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img className="sc-thumb-img" src={post.featuredImage} alt="" loading="lazy" />
+                                    <span className="sc-thumb-badge" style={{ color: t.text, background: t.bg }}>
+                                      {post.schemeType}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="sc-cat" style={{ color: t.text }}>
+                                      {post.schemeType}
+                                    </span>
+                                    <span className="ac-card-org" style={{ color: t.text }}>
+                                      {post.org}
+                                    </span>
+                                    <span className="ac-card-accent" style={{ backgroundColor: t.accent }} />
+                                  </>
+                                )}
                               </Link>
 
                               <div className="ac-card-body">
                                 <h2 className="ac-card-title">
                                   <Link href={href}>{post.title}</Link>
                                 </h2>
+                                {post.summary && <p className="sc-summary">{post.summary}</p>}
                                 <div className="sc-meta">
                                   <BuildingIcon />
                                   <span>{post.org}</span>
@@ -765,7 +802,7 @@ export default function CategoryBody({ slug }) {
                                   <CalendarIcon />
                                   <span>{post.date}</span>
                                 </div>
-                                <span className="sc-status">{post.status}</span>
+                                <span className="sc-status">{post.statusLabel || post.status}</span>
                                 <Link href={href} className="ac-card-btn">
                                   <span>VIEW DETAILS</span>
                                   <span className="jb-chev">→</span>

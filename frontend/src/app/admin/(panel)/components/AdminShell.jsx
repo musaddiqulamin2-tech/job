@@ -40,6 +40,17 @@ const links = [
     ),
   },
   {
+    href: "/admin/schemes",
+    label: "Schemes",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2 3 7l9 5 9-5-9-5Z" />
+        <path d="M3 12l9 5 9-5" />
+        <path d="M3 17l9 5 9-5" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/applications",
     label: "Applications",
     icon: (
@@ -117,6 +128,8 @@ const links = [
 const titles = {
   "/admin/posts": "All Posts",
   "/admin/posts/new": "Add New Post",
+  "/admin/schemes": "Schemes",
+  "/admin/schemes/new": "Add New Scheme",
   "/admin/media": "Media Library",
   "/admin/categories": "Categories",
   "/admin/jobs": "Manage Jobs",

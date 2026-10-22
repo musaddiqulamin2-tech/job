@@ -103,6 +103,25 @@ function AndroidIcon() {
 export default function Home() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [schemes, setSchemes] = useState([]);
+  const [schemesLoading, setSchemesLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadSchemes() {
+      try {
+        const res = await apiFetch("/api/site/schemes?limit=6");
+        const data = await res.json();
+        if (data.success && Array.isArray(data.schemes)) {
+          setSchemes(data.schemes);
+        }
+      } catch (error) {
+        console.error("Failed to load schemes", error);
+      } finally {
+        setSchemesLoading(false);
+      }
+    }
+    loadSchemes();
+  }, []);
 
   useEffect(() => {
     async function loadJobs() {
@@ -217,6 +236,52 @@ export default function Home() {
             </a>
           </div>
         </div>
+
+        <section className="ja-scheme-sec">
+          <div className="ja-bar ja-bar-red">
+            <h2 className="ja-bar-title">Latest Government Schemes</h2>
+            <Link className="ja-bar-btn" href="/category/scheme">
+              View All Schemes <ChevronIcon />
+            </Link>
+          </div>
+
+          {schemesLoading ? (
+            <div className="ja-row-empty">
+              <span className="jh-spinner" /> Loading schemes...
+            </div>
+          ) : schemes.length > 0 ? (
+            <div className="ja-scheme-grid">
+              {schemes.map((scheme) => (
+                <article className="ja-scheme-card" key={scheme._id || scheme.slug}>
+                  <Link className="ja-scheme-thumb" href={`/scheme/${scheme.slug}`} tabIndex={-1} aria-hidden="true">
+                    {scheme.featuredImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={scheme.featuredImage} alt="" loading="lazy" />
+                    ) : (
+                      <span className="ja-scheme-thumb-fallback">{scheme.schemeType || "Scheme"}</span>
+                    )}
+                  </Link>
+                  <div className="ja-scheme-body">
+                    <span className="ja-scheme-type">{scheme.schemeType || "Government Scheme"}</span>
+                    <h3 className="ja-scheme-title">
+                      <Link href={`/scheme/${scheme.slug}`}>{scheme.title}</Link>
+                    </h3>
+                    {scheme.summary && <p className="ja-scheme-summary">{scheme.summary}</p>}
+                    <div className="ja-scheme-meta">
+                      {scheme.department && <span>{scheme.department}</span>}
+                      {scheme.date && <span>{scheme.date}</span>}
+                    </div>
+                    <Link className="ja-scheme-more" href={`/scheme/${scheme.slug}`}>
+                      Read More <ChevronIcon />
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="ja-row-empty">No schemes published yet. Check back soon.</div>
+          )}
+        </section>
 
         <div className="ja-grid">
           <div className="ja-container">

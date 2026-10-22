@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const STATIC_USABLE = [
   "/", "/apply", "/contact", "/terms", "/privacy", "/disclaimer",
   "/jobs", "/government-jobs", "/private-jobs", "/admit-cards",
-  "/results", "/admissions", "/answer-keys", "/syllabus",
+  "/results", "/admissions", "/answer-keys", "/syllabus", "/category/scheme",
 ];
 
 export default async function sitemap() {
@@ -36,5 +36,22 @@ export default async function sitemap() {
     console.error("sitemap api error:", error.message);
   }
 
-  return [...staticEntries, ...postEntries];
+  let schemeEntries = [];
+  try {
+    const res = await apiFetch("/api/site/schemes?page=1&limit=100");
+    if (res.ok) {
+      const data = await res.json();
+      const schemes = Array.isArray(data.schemes) ? data.schemes : [];
+      schemeEntries = schemes.map((scheme) => ({
+        url: `${BASE}/scheme/${scheme.slug}`,
+        lastModified: scheme.updatedAt || scheme.publishedAt || new Date(),
+        changeFrequency: "weekly",
+        priority: 0.7,
+      }));
+    }
+  } catch (error) {
+    console.error("sitemap schemes error:", error.message);
+  }
+
+  return [...staticEntries, ...postEntries, ...schemeEntries];
 }

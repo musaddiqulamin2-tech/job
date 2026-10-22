@@ -1,161 +1,262 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSampleScheme } from "../../../lib/categoryData";
+import { apiFetch } from "../../../lib/api";
+import { schemeCategoryLabel, formatSchemeDate } from "../../../lib/schemeMeta";
 
-const TYPE_ICON = "M21 13.255A23.931 23.931 0 0 1 12 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2";
-const ORG_ICON = "M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0H3m16 0h2M7 21h10M9 7h1m1 0h1m-2 4h1m1 0h1m-2 4h1m1 0h1m-4-8H7";
-const STATUS_ICON = "M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z";
-const DATE_ICON = "M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3";
-const CATEGORY_ICON = "M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16";
-const SITE_ICON = "M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9";
+export const dynamic = "force-dynamic";
+
+const SITE = "https://jobcareercanvas.in";
+
+async function fetchScheme(slug) {
+  try {
+    const res = await apiFetch(`/api/site/schemes/${encodeURIComponent(slug)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && data.success !== false && data.scheme ? data.scheme : null;
+  } catch (error) {
+    console.error("scheme detail error:", error.message);
+    return null;
+  }
+}
+
+async function fetchRelated(scheme) {
+  if (!scheme?.category) return [];
+  try {
+    const res = await apiFetch(`/api/site/schemes?category=${encodeURIComponent(scheme.category)}&limit=5`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list = Array.isArray(data.schemes) ? data.schemes : [];
+    return list.filter((s) => s.slug !== scheme.slug).slice(0, 4);
+  } catch {
+    return [];
+  }
+}
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
-  const post = getSampleScheme(slug);
-  if (!post) {
-    return { title: "Scheme Details | JobCareer" };
-  }
+  const scheme = await fetchScheme(slug);
+  if (!scheme) return { title: "Scheme Not Found | JobCareer Canvas" };
+
+  const description =
+    scheme.seo?.description || scheme.summary || String(scheme.description || "").slice(0, 160);
   return {
-    title: `${post.title} | JobCareer`,
-    description: `Know the ${post.schemeType} ${post.title} by ${post.org}, benefits, eligibility, documents and how to apply.`,
+    title: scheme.seo?.title || `${scheme.title} | JobCareer Canvas`,
+    description,
+    robots: scheme.seo?.robots || "index, follow",
+    alternates: scheme.seo?.canonical
+      ? { canonical: scheme.seo.canonical }
+      : { canonical: `${SITE}/scheme/${scheme.slug}` },
+    openGraph: {
+      title: scheme.title,
+      description,
+      siteName: "JobCareer Canvas",
+      url: `${SITE}/scheme/${scheme.slug}`,
+      images: scheme.seo?.image || scheme.featuredImage || `${SITE}/brand/jobcareer-logo.png`,
+      type: "article",
+    },
   };
+}
+
+function Fact({ label, value }) {
+  if (!value) return null;
+  return (
+    <div className="ja-detail-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ListSection({ title, items }) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return (
+    <section className="ja-scheme-section">
+      <h2>{title}</h2>
+      <ul className="jh-detail-list">
+        {items.map((item, i) => (
+          <li key={i}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function paragraphs(text) {
+  return String(text || "")
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
+    .filter(Boolean);
 }
 
 export default async function SchemeDetailPage({ params }) {
   const { slug } = await params;
-  const post = getSampleScheme(slug);
-  if (!post) {
-    notFound();
-  }
+  const scheme = await fetchScheme(slug);
+  if (!scheme) notFound();
 
-  const details = [
-    { label: "Scheme Type", value: post.schemeType, icon: TYPE_ICON },
-    { label: "Organization", value: post.org, icon: ORG_ICON },
-    { label: "Status", value: post.status, icon: STATUS_ICON },
-    { label: "Published", value: post.date, icon: DATE_ICON },
-    { label: "Category", value: post.category, icon: CATEGORY_ICON },
-  ];
+  const related = await fetchRelated(scheme);
+  const published = formatSchemeDate(scheme.publishedAt || scheme.createdAt);
+  const links = [
+    { label: "Apply Online", url: scheme.applyLink, primary: true },
+    { label: "Official Website", url: scheme.officialWebsite },
+    { label: "Notification / Guidelines", url: scheme.notificationLink },
+  ].filter((l) => l.url);
+
+  const hasFacts = scheme.department || scheme.schemeType || scheme.state || scheme.category;
+  const hasDates = scheme.startDate || scheme.lastDate || published;
 
   return (
-    <main className="jh-detail-page">
-      <div className="jh-container">
-        <Link href="/category/scheme" className="jh-detail-back">
-          ← Back to Schemes
-        </Link>
+    <div className="ja-home">
+      <div className="ja-home-inner">
+        <div className="ja-container">
+          <nav className="ja-breadcrumb" aria-label="Breadcrumb">
+            <Link href="/">Home</Link>
+            <span>/</span>
+            <Link href="/category/scheme">Schemes</Link>
+            <span>/</span>
+            <span className="ja-breadcrumb-current">{scheme.title}</span>
+          </nav>
 
-        <div className="jh-detail-hero">
-          <div className="jh-detail-hero-orb jh-detail-orb-1" />
-          <div className="jh-detail-hero-orb jh-detail-orb-2" />
+          <article className="ja-detail-card">
+            <header className="ja-detail-header">
+              <h1 className="ja-detail-title">{scheme.title}</h1>
+              <div className="ja-post-grid-meta">
+                <span className="ja-post-meta-badge ja-meta-brand">
+                  <Link href="/category/scheme">{schemeCategoryLabel(scheme.category)}</Link>
+                </span>
+                {scheme.schemeType && <span className="ja-post-meta-badge">{scheme.schemeType}</span>}
+                {published && <span className="ja-post-meta-badge">Published: {published}</span>}
+                {scheme.statusLabel && <span className="ja-post-meta-badge">{scheme.statusLabel}</span>}
+              </div>
+            </header>
 
-          <div className={`jh-job-tag jh-tag-${post.tagColor || "emerald"}`}>
-            {post.schemeType}
-          </div>
+            {scheme.featuredImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="ja-detail-hero" src={scheme.featuredImage} alt={scheme.title} />
+            )}
 
-          <h1 className="jh-detail-title">{post.title}</h1>
-          <p className="jh-detail-company">{post.org}</p>
+            {links.length > 0 && (
+              <div className="ja-detail-link-grid ja-scheme-top-links">
+                {links.map((l) => (
+                  <a
+                    key={l.label}
+                    className={l.primary ? "jh-btn jh-btn-primary" : "ja-detail-link-btn"}
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {l.label}
+                  </a>
+                ))}
+              </div>
+            )}
 
-          <div className="jh-detail-meta">
-            <span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={DATE_ICON} /></svg>
-              {post.date}
-            </span>
-            <span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={STATUS_ICON} /></svg>
-              {post.status}
-            </span>
-          </div>
+            {scheme.summary && <p className="ja-detail-summary">{scheme.summary}</p>}
 
-          <div className="jh-detail-row">
-            <div className="jh-detail-salary">
-              <span className="jh-detail-salary-label">Scheme</span>
-              <strong>{post.schemeType}</strong>
+            {hasFacts && (
+              <aside className="ja-detail-facts">
+                <h2>Scheme Overview</h2>
+                <div className="ja-detail-grid">
+                  <Fact label="Department" value={scheme.department} />
+                  <Fact label="Scheme Type" value={scheme.schemeType} />
+                  <Fact label="State / Region" value={scheme.state} />
+                  <Fact label="Category" value={schemeCategoryLabel(scheme.category)} />
+                </div>
+              </aside>
+            )}
+
+            {hasDates && (
+              <section className="ja-scheme-section">
+                <h2>Important Dates</h2>
+                <div className="ja-detail-grid">
+                  <Fact label="Application Start" value={scheme.startDate} />
+                  <Fact label="Last Date" value={scheme.lastDate} />
+                  <Fact label="Published On" value={published} />
+                </div>
+              </section>
+            )}
+
+            {scheme.description && (
+              <section className="ja-scheme-section">
+                <h2>About the Scheme</h2>
+                <div className="ja-detail-body">
+                  {paragraphs(scheme.description).map((p, i) => (
+                    <p key={i}>{p}</p>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <ListSection title="Benefits" items={scheme.benefits} />
+            <ListSection title="Eligibility" items={scheme.eligibility} />
+            <ListSection title="Required Documents" items={scheme.requiredDocuments} />
+
+            {Array.isArray(scheme.howToApply) && scheme.howToApply.length > 0 && (
+              <section className="ja-scheme-section">
+                <h2>How to Apply</h2>
+                <ol className="ja-steps">
+                  {scheme.howToApply.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {links.length > 0 && (
+              <section className="ja-detail-links">
+                <h2>Important Links</h2>
+                <div className="ja-detail-link-grid">
+                  {links.map((l) => (
+                    <a
+                      key={l.label}
+                      className="ja-detail-link-btn"
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {l.label}
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {Array.isArray(scheme.faqs) && scheme.faqs.length > 0 && (
+              <section className="ja-scheme-section">
+                <h2>Frequently Asked Questions</h2>
+                <div className="ja-faq-list">
+                  {scheme.faqs.map((faq, i) => (
+                    <details className="ja-faq" key={i}>
+                      <summary>{faq.question}</summary>
+                      <p>{faq.answer}</p>
+                    </details>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {Array.isArray(scheme.tags) && scheme.tags.length > 0 && (
+              <div className="ja-detail-tags">
+                {scheme.tags.map((t) => (
+                  <span key={t} className="ja-tag">#{t}</span>
+                ))}
+              </div>
+            )}
+          </article>
+        </div>
+
+        {related.length > 0 && (
+          <div className="ja-container">
+            <h2 className="ja-section-title">Related Schemes</h2>
+            <div className="ja-container ja-related-schemes">
+              {related.map((s) => (
+                <Link className="ja-post-row" href={`/scheme/${s.slug}`} key={s._id || s.slug}>
+                  {s.title}
+                </Link>
+              ))}
             </div>
-            <a
-              href={post.officialSite}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="jh-btn jh-btn-primary jh-detail-apply"
-            >
-              Apply / View Official Website
-            </a>
           </div>
-        </div>
-
-        <div className="jh-detail-overview">
-          {details.map((d) => (
-            <div className="jh-detail-info-card" key={d.label}>
-              <span className="jh-detail-info-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d={d.icon} /></svg>
-              </span>
-              <span className="jh-detail-info-label">{d.label}</span>
-              <span className="jh-detail-info-value">{d.value}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="jh-detail-body">
-          <h2>About the Scheme</h2>
-          <p>
-            {post.org} operates the {post.title}. This {post.schemeType.toLowerCase()} supports eligible citizens with
-            benefits aligned to the official guidelines. Interested applicants are advised to read the complete
-            notification and check their eligibility before submitting the application form.
-          </p>
-
-          <h2>Benefits</h2>
-          <ul className="jh-detail-list">
-            <li>Direct financial assistance or scholarship amount as per the scheme guidelines of {post.org}.</li>
-            <li>Simple online application process through the official portal.</li>
-            <li>Transparent selection and disbursement through verified beneficiary lists.</li>
-            <li>Available support and helpdesk assistance for applicants.</li>
-          </ul>
-
-          <h2>Eligibility</h2>
-          <ul className="jh-detail-list">
-            <li>Applicant must be a resident of India / Assam as required by the scheme.</li>
-            <li>Category-specific conditions (age, income, course, and family income limit) apply as per the notification.</li>
-            <li>Valid bank account linked with the applicant / guardian for benefit transfer.</li>
-            <li>Applicant must not be availing a similar benefit under another government scheme.</li>
-          </ul>
-
-          <h2>Required Documents</h2>
-          <ul className="jh-detail-list">
-            <li>Aadhaar card and residential proof</li>
-            <li>Bank account details (passbook) with IFSC code</li>
-            <li>Income certificate and category certificate (if applicable)</li>
-            <li>Educational certificate / mark sheet as required by the scheme</li>
-            <li>Recent passport-size photograph and mobile number</li>
-          </ul>
-
-          <h2>How to Apply</h2>
-          <ul className="jh-detail-list">
-            <li>Visit the official website of {post.org} and open the scheme portal.</li>
-            <li>Register or log in with your mobile number / Aadhaar.</li>
-            <li>Fill in the online application form and upload the required documents.</li>
-            <li>Submit the form and take a note of the application / reference number.</li>
-            <li>Track the application status from the beneficiary or status section.</li>
-          </ul>
-
-          <h2>Important Links</h2>
-          <ul className="jh-detail-list">
-            <li>
-              <span>Official Website: </span>
-              <a href={post.officialSite} target="_blank" rel="noopener noreferrer">
-                {post.org} — {post.schemeType}
-              </a>
-            </li>
-            <li>Latest circular and notification on the JobCareer Schemes page</li>
-          </ul>
-
-          <div className="jh-detail-cta">
-            <h3>Check the official details</h3>
-            <p>Visit the official website of {post.org} for the complete notification and application form.</p>
-            <a href={post.officialSite} target="_blank" rel="noopener noreferrer" className="jh-btn jh-btn-primary">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 8, verticalAlign: "middle" }}><path d={SITE_ICON} /></svg>
-              Visit Official Website
-            </a>
-          </div>
-        </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }
