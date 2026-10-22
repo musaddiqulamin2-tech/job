@@ -167,7 +167,7 @@ export default function ResultsCategory({ posts, current, total }) {
                 </>
               ) : (
                 <div className="ja-empty">
-                  <p>Unable to load results right now. Please try again.</p>
+                  <p>No results published yet. Please check back soon.</p>
                 </div>
               )}
 

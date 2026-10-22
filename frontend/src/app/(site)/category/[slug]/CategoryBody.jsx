@@ -300,7 +300,7 @@ export default function CategoryBody({ slug }) {
   const meta = getCategoryMeta(rawSlug);
   const admitPosts = getAdmitCardPosts();
 
-  const [posts, setPosts] = useState(isSchemes ? [] : isAdmitCard ? admitPosts : meta.fallbacks);
+  const [posts, setPosts] = useState(isSchemes || isResults ? [] : isAdmitCard ? admitPosts : meta.fallbacks);
   const [loading, setLoading] = useState(isAdmitCard ? false : true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [page, setPage] = useState(1);
@@ -344,12 +344,12 @@ export default function CategoryBody({ slug }) {
         if (data.success && data.jobs && data.jobs.length > 0) {
           setPosts(data.jobs);
         } else {
-          setPosts(meta.fallbacks);
+          setPosts(isResults ? [] : meta.fallbacks);
         }
         setLoadFailed(false);
       } catch (err) {
         console.error("Error fetching category posts:", err);
-        setPosts(meta.fallbacks);
+        setPosts(isResults ? [] : meta.fallbacks);
         setLoadFailed(true);
       } finally {
         setLoading(false);

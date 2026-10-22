@@ -1,5 +1,4 @@
 import { apiFetch } from "./api";
-import { getSampleResults, getResultPage } from "./categoryData";
 
 export const RESULT_LIMIT = 12;
 
@@ -11,18 +10,13 @@ export async function loadResultPage(page, limit = RESULT_LIMIT) {
     );
     if (!res.ok) throw new Error("results-unavailable");
     const data = await res.json();
-    if (data.success !== false && Number(data.total) === 0) {
-      return {
-        posts: getResultPage(current, limit),
-        total: getSampleResults().length,
-      };
-    }
+    const posts = Array.isArray(data.posts) ? data.posts : [];
     return {
-      posts: Array.isArray(data.posts) ? data.posts : getResultPage(current, limit),
-      total: Number(data.total) || (Array.isArray(data.posts) ? data.posts.length : 0),
+      posts,
+      total: Number(data.total) || posts.length,
     };
   } catch {
-    return { posts: getResultPage(current, limit), total: getSampleResults().length };
+    return { posts: [], total: 0 };
   }
 }
 
@@ -31,10 +25,9 @@ export async function loadResultTotal() {
     const res = await apiFetch(`/api/site/category-jobs?type=result&page=1&limit=1`);
     if (!res.ok) throw new Error("results-unavailable");
     const data = await res.json();
-    const total = Number(data.total) || 0;
-    return total === 0 ? getSampleResults().length : total;
+    return Number(data.total) || 0;
   } catch {
-    return getSampleResults().length;
+    return 0;
   }
 }
 
