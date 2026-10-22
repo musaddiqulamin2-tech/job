@@ -108,6 +108,71 @@ export async function PUT(request, { params }) {
   }
 }
 
+const WHATSAPP_SHARE_STATUSES = ["draft", "ready", "share-opened", "published"];
+
+export async function PATCH(request, { params }) {
+  const { error } = await requireAdmin();
+  if (error) return error;
+  if (!(await verifyCsrf(request))) {
+    return Response.json({ success: false, message: "Invalid security token. Refresh and try again." }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  let data;
+  try {
+    data = await request.json();
+  } catch {
+    return Response.json({ success: false, message: "Invalid request body." }, { status: 400 });
+  }
+
+  const updates = {};
+  if (data?.whatsappStatus !== undefined) {
+    if (!WHATSAPP_SHARE_STATUSES.includes(data.whatsappStatus)) {
+      return Response.json({ success: false, message: "Invalid WhatsApp share status." }, { status: 422 });
+    }
+    updates.whatsappStatus = data.whatsappStatus;
+    updates.whatsappUpdatedAt = new Date();
+    if (data.whatsappStatus === "published") updates.whatsappPublishedAt = new Date();
+  }
+  if (data?.featuredImage !== undefined) {
+    const image = String(data.featuredImage || "").trim();
+    if (image && !/^https?:\/\/[^\s]+$/i.test(image)) {
+      return Response.json(
+        { success: false, message: "Enter a valid image URL.", errors: { featuredImage: "Enter a valid http(s) URL." } },
+        { status: 422 }
+      );
+    }
+    updates.featuredImage = image.slice(0, 500);
+  }
+  if (!Object.keys(updates).length) {
+    return Response.json({ success: false, message: "Nothing to update." }, { status: 400 });
+  }
+
+  try {
+    await withTimeout(connectDB());
+    const scheme = await Scheme.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true });
+    if (!scheme) {
+      return Response.json({ success: false, message: "Scheme not found." }, { status: 404 });
+    }
+    emitEvent("scheme:updated", { _id: String(scheme._id), title: scheme.title, status: scheme.status });
+    liveLog({ level: "INFO", source: "SchemesAPI", message: `Scheme share status: ${scheme.whatsappStatus || "cleared"} (${scheme.title})` });
+
+    return Response.json({
+      success: true,
+      message: "Scheme sharing state updated.",
+      whatsappStatus: scheme.whatsappStatus,
+      whatsappUpdatedAt: scheme.whatsappUpdatedAt,
+      whatsappPublishedAt: scheme.whatsappPublishedAt,
+      featuredImage: scheme.featuredImage,
+    });
+  } catch (err) {
+    console.error("Admin update scheme share status error:", err.message);
+    if (isDbError(err)) return dbUnavailable();
+    return Response.json({ success: false, message: "Failed to update scheme sharing state." }, { status: 500 });
+  }
+}
+
 export async function DELETE(request, { params }) {
   const { error } = await requireAdmin();
   if (error) return error;
@@ -138,5 +203,6 @@ import { Router } from "express";
 const router = Router();
 router.get("/:id", expressify(GET));
 router.put("/:id", expressify(PUT));
+router.patch("/:id", expressify(PATCH));
 router.delete("/:id", expressify(DELETE));
 export default router;

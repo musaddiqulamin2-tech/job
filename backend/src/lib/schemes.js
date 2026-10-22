@@ -241,12 +241,18 @@ export function schemeStatusLabel(scheme, now = new Date()) {
 
 export function publicScheme(scheme, now = new Date()) {
   if (!scheme) return null;
+  const {
+    whatsappStatus: _waStatus,
+    whatsappUpdatedAt: _waUpdatedAt,
+    whatsappPublishedAt: _waPublishedAt,
+    ...rest
+  } = scheme;
   const publishedAt = scheme.publishedAt || scheme.createdAt;
   const date = publishedAt
     ? new Date(publishedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
     : "";
   return {
-    ...scheme,
+    ...rest,
     _id: String(scheme._id),
     org: scheme.department || "Government",
     group: scheme.category,

@@ -8,6 +8,7 @@ import {
   schemeCategoryLabel,
 } from "../../../lib/schemeMeta";
 import { Toast } from "./AdminUI";
+import SchemeWhatsAppShare from "./SchemeWhatsAppShare";
 import { apiJson, readFileAsDataUrl, slugify, toLocalInputValue } from "./api";
 
 const EMPTY_FORM = {
@@ -229,6 +230,19 @@ export default function SchemeEditor({ schemeId = null, initial = null }) {
           <p>Publish government schemes with eligibility, benefits, dates and official links.</p>
         </div>
         <div className="t-header-actions">
+          {savedScheme && (
+            <SchemeWhatsAppShare
+              scheme={savedScheme}
+              label="WhatsApp Post"
+              onStatusChange={(whatsappStatus) =>
+                setSavedScheme((s) => (s ? { ...s, whatsappStatus } : s))
+              }
+              onImageChange={(featuredImage) => {
+                setSavedScheme((s) => (s ? { ...s, featuredImage } : s));
+                update("featuredImage", featuredImage);
+              }}
+            />
+          )}
           {isPublished && (
             <a href={`/scheme/${savedScheme?.slug || form.slug}`} target="_blank" rel="noreferrer" className="admin-btn">
               View on Site

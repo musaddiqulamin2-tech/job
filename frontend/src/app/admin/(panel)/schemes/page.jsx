@@ -7,7 +7,9 @@ import {
   SCHEME_STATUS_META,
   schemeCategoryLabel,
 } from "../../../lib/schemeMeta";
+import { SCHEME_SHARE_STATUS_META } from "../../../lib/schemeShare";
 import { Spinner, EmptyState, ErrorState, Pagination, Toast } from "../components/AdminUI";
+import SchemeWhatsAppShare from "../components/SchemeWhatsAppShare";
 import { apiJson } from "../components/api";
 
 function fmt(d) {
@@ -62,6 +64,10 @@ export default function SchemesPage() {
   }, []);
 
   const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  function patchRow(id, changes) {
+    setSchemes((list) => list.map((s) => (s._id === id ? { ...s, ...changes } : s)));
+  }
 
   async function bulk(action) {
     if (!selected.length) return;
@@ -180,6 +186,7 @@ export default function SchemesPage() {
                       <th>Department</th>
                       <th>Category</th>
                       <th>Status</th>
+                      <th>WhatsApp</th>
                       <th>Featured</th>
                       <th>Published</th>
                       <th>Updated</th>
@@ -209,6 +216,13 @@ export default function SchemesPage() {
                             {SCHEME_STATUS_META[s.status]?.label || s.status}
                           </span>
                         </td>
+                        <td>
+                          <span
+                            className={`admin-badge ${(SCHEME_SHARE_STATUS_META[s.whatsappStatus] || SCHEME_SHARE_STATUS_META[""]).cls}`}
+                          >
+                            {(SCHEME_SHARE_STATUS_META[s.whatsappStatus] || SCHEME_SHARE_STATUS_META[""]).label}
+                          </span>
+                        </td>
                         <td>{s.featured ? "★" : "—"}</td>
                         <td>{s.status === "scheduled" ? fmt(s.scheduledAt) : fmt(s.publishedAt)}</td>
                         <td>{fmt(s.updatedAt)}</td>
@@ -218,6 +232,12 @@ export default function SchemesPage() {
                             {s.status === "published" && (
                               <a href={`/scheme/${s.slug}`} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">View</a>
                             )}
+                            <SchemeWhatsAppShare
+                              scheme={s}
+                              label="WhatsApp"
+                              onStatusChange={(status) => patchRow(s._id, { whatsappStatus: status })}
+                              onImageChange={(featuredImage) => patchRow(s._id, { featuredImage })}
+                            />
                             <button
                               type="button"
                               className="admin-btn admin-btn-sm admin-btn-danger"

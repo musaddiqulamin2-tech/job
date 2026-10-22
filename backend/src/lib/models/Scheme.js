@@ -58,6 +58,14 @@ const SchemeSchema = new mongoose.Schema(
     publishedAt: { type: Date, default: null },
     expiresAt: { type: Date, default: null },
     views: { type: Number, default: 0 },
+    whatsappStatus: {
+      type: String,
+      enum: ["", "draft", "ready", "share-opened", "published"],
+      default: "",
+      index: true,
+    },
+    whatsappUpdatedAt: { type: Date, default: null },
+    whatsappPublishedAt: { type: Date, default: null },
     seo: { type: SeoSchema, default: () => ({}) },
   },
   { timestamps: true }
