@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
 import { apiJson, readFileAsDataUrl } from "./api";
 import { JOB_STATUSES } from "./AdminUI";
+import { clearPreviewPayload, createPreviewId, savePreviewPayload } from "./previewStore";
 
 const typeOptions = ["Full Time", "Part Time", "Contract", "Internship", "Remote"];
 const categoryOptions = [
@@ -24,6 +25,14 @@ const categoryOptions = [
   "Design",
   "Other",
 ];
+
+function legacyCategoryToCms(category) {
+  const c = String(category || "").toLowerCase();
+  if (c.includes("government") || c.includes("banking") || c.includes("railway") || c.includes("psu")) {
+    return "government-job";
+  }
+  return "private-job";
+}
 
 const empty = {
   title: "",
@@ -51,6 +60,9 @@ export default function JobForm({ initial = null, jobId = null }) {
   const [error, setError] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [imageError, setImageError] = useState("");
+  const previewWin = useRef(null);
+  const previewId = useRef(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [form, setForm] = useState(() => ({
     ...empty,
     ...(initial
@@ -115,6 +127,82 @@ export default function JobForm({ initial = null, jobId = null }) {
     setForm((prev) => ({ ...prev, featuredImage: "" }));
     setImageError("");
   }
+
+  function buildPreviewPayload() {
+    const lines = (v) => String(v || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    return {
+      title: form.title,
+      slug: "",
+      category: legacyCategoryToCms(form.category),
+      status: form.status,
+      summary: form.description,
+      featuredImage: form.featuredImage,
+      organization: form.company,
+      location: form.location,
+      qualification: lines(form.requirements).join("\n"),
+      vacancyCount: form.vacancies,
+      salary: form.salary,
+      jobType: form.type,
+      experience: form.experience,
+      eligibility: lines(form.requirements).join("\n"),
+      responsibilities: lines(form.responsibilities),
+      lastDate: form.lastDate,
+      applicationUrl: form.officialLink,
+      importantLinks: form.officialLink
+        ? [{ label: "Apply Online", url: form.officialLink, type: "apply" }]
+        : [],
+      tags: [],
+      contentHtml: "",
+      seo: {},
+    };
+  }
+
+  function openPreview() {
+    const id = createPreviewId();
+    if (!savePreviewPayload(id, buildPreviewPayload())) {
+      setError("Preview could not be prepared. Please try again.");
+      return;
+    }
+    previewId.current = id;
+    const back = jobId ? `/admin/jobs/${jobId}` : "/admin/jobs/new";
+    const url = `/admin/preview?k=${encodeURIComponent(id)}&back=${encodeURIComponent(back)}`;
+    const win = window.open(url, "jobcareer-preview");
+    if (!win) {
+      clearPreviewPayload(id);
+      previewId.current = null;
+      setError("Popup blocked. Allow popups for this site to open the preview page.");
+      return;
+    }
+    previewWin.current = win;
+    setPreviewOpen(true);
+    win.focus();
+  }
+
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const timer = window.setInterval(() => {
+      const win = previewWin.current;
+      if (!win || win.closed) {
+        previewWin.current = null;
+        if (previewId.current) clearPreviewPayload(previewId.current);
+        previewId.current = null;
+        setPreviewOpen(false);
+      }
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [previewOpen]);
+
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const id = previewId.current;
+    if (!id) return undefined;
+    const timer = window.setTimeout(() => {
+      const win = previewWin.current;
+      if (!win || win.closed) return;
+      savePreviewPayload(id, buildPreviewPayload());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [previewOpen, form]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -414,6 +502,9 @@ export default function JobForm({ initial = null, jobId = null }) {
         </div>
 
         <div className="admin-form-actions">
+          <button type="button" className="admin-btn" onClick={openPreview}>
+            Preview
+          </button>
           <button
             type="button"
             className="admin-btn admin-btn-ghost"

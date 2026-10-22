@@ -16,6 +16,8 @@ import WhatsAppShare from "./WhatsAppShare";
 import { Toast, Spinner } from "./AdminUI";
 import { apiJson, readFileAsDataUrl, slugify, toLocalInputValue } from "./api";
 import { ActionBar } from "./EditorToolbar";
+import JobPreview from "./JobPreview";
+import { clearPreviewPayload, createPreviewId, savePreviewPayload } from "./previewStore";
 
 const CATEGORIES = Object.keys(POST_CATEGORY_META);
 
@@ -130,6 +132,8 @@ function Field({ id, label, value, onChange, error, placeholder = "", textarea =
 export default function PostEditor({ postId = null, initial = null }) {
   const router = useRouter();
   const fileInput = useRef(null);
+  const previewWin = useRef(null);
+  const previewId = useRef(null);
   const slugTouched = useRef(Boolean(initial?.slug));
   const [tab, setTab] = useState("content");
   const [savingAction, setSavingAction] = useState("");
@@ -137,6 +141,8 @@ export default function PostEditor({ postId = null, initial = null }) {
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState(() => formFrom(initial));
   const [seo, setSeo] = useState(() => seoFrom(initial));
+  const [contentTick, setContentTick] = useState(0);
+  const [previewOpen, setPreviewOpen] = useState(false);
   // The WhatsApp share post is built from the record that is actually saved, so
   // the generated text always matches what the public site is serving.
   const [savedPost, setSavedPost] = useState(initial || null);
@@ -186,6 +192,7 @@ export default function PostEditor({ postId = null, initial = null }) {
     content: initialContent,
     editorProps,
     immediatelyRender: false,
+    onUpdate: () => setContentTick((n) => n + 1),
   });
 
   function toastMsg(type, message) {
@@ -347,7 +354,95 @@ export default function PostEditor({ postId = null, initial = null }) {
     }
   }
 
-  const previewHtml = editor && tab === "preview" ? jsonToHtml(editor.getJSON()) : "";
+  function buildPreviewPayload(includeContent = false) {
+    const toArr = (v) => String(v || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    return {
+      title: form.title.trim(),
+      slug: form.slug.trim() || slugify(form.title),
+      category: form.category,
+      status: savedPost?.status || "draft",
+      summary: form.summary,
+      featuredImage: form.featuredImage,
+      organization: form.organization,
+      location: form.location,
+      qualification: form.qualification,
+      ageLimit: form.ageLimit,
+      ageRelaxation: form.ageRelaxation,
+      vacancyCount: form.vacancyCount,
+      applicationFee: form.applicationFee,
+      paymentMode: form.paymentMode,
+      eligibility: form.eligibility,
+      selectionProcess: toArr(form.selectionProcess),
+      howToApply: toArr(form.howToApply),
+      startDate: form.startDate,
+      lastDate: form.lastDate,
+      examDate: form.examDate,
+      admitCardDate: form.admitCardDate,
+      resultDate: form.resultDate,
+      officialNotificationUrl: form.officialNotificationUrl,
+      applicationUrl: form.applicationUrl,
+      importantLinks: form.importantLinks.filter((l) => l.label && l.url),
+      tags: String(form.tags || "").split(",").map((t) => t.trim()).filter(Boolean),
+      contentHtml: includeContent && editor ? jsonToHtml(editor.getJSON()) : "",
+      seo: { ...seo },
+    };
+  }
+
+  // The preview page (opened in a separate tab) reads the payload from
+  // localStorage, so the draft stays unpublished while it is being reviewed.
+  function openPreview() {
+    const id = createPreviewId();
+    const payload = buildPreviewPayload(true);
+    if (!savePreviewPayload(id, payload)) {
+      setTab("preview");
+      toastMsg("error", "Preview could not be prepared in a new tab. Showing the inline preview instead.");
+      return;
+    }
+    previewId.current = id;
+    const back = postId ? `/admin/posts/${postId}` : "/admin/posts/new";
+    const url = `/admin/preview?k=${encodeURIComponent(id)}&back=${encodeURIComponent(back)}`;
+    const win = window.open(url, "jobcareer-preview");
+    if (!win) {
+      clearPreviewPayload(id);
+      setTab("preview");
+      toastMsg("error", "Popup blocked. Showing the preview inside the editor instead.");
+      return;
+    }
+    previewWin.current = win;
+    setPreviewOpen(true);
+    win.focus();
+  }
+
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const timer = window.setInterval(() => {
+      const win = previewWin.current;
+      if (!win || win.closed) {
+        previewWin.current = null;
+        if (previewId.current) clearPreviewPayload(previewId.current);
+        previewId.current = null;
+        setPreviewOpen(false);
+        return;
+      }
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [previewOpen]);
+
+  // Keep the preview tab in sync with the editor while it is open.
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const id = previewId.current;
+    if (!id) return undefined;
+    const timer = window.setTimeout(() => {
+      const win = previewWin.current;
+      if (!win || win.closed) return;
+      savePreviewPayload(id, buildPreviewPayload(true));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [previewOpen, form, seo, contentTick, savedPost]);
+
+  const previewPost = buildPreviewPayload(tab === "preview" || previewOpen);
+  const isPublished = savedPost?.status === "published";
 
   function field(k, label, extra = {}) {
     return <Field key={k} id={`f-${k}`} label={label} value={form[k]} error={errors[k]} onChange={(value) => update(k, value)} {...extra} />;
@@ -363,9 +458,14 @@ export default function PostEditor({ postId = null, initial = null }) {
           <p>Write rich content, set job details and manage publishing.</p>
         </div>
         <div className="t-header-actions">
-          <a href={`/post/${form.slug || "preview"}`} target="_blank" rel="noreferrer" className="admin-btn">
-            View on Site
-          </a>
+          <button type="button" className="admin-btn" onClick={openPreview}>
+            Preview
+          </button>
+          {isPublished && (
+            <a href={`/post/${savedPost?.slug || form.slug}`} target="_blank" rel="noreferrer" className="admin-btn">
+              View on Site
+            </a>
+          )}
           <WhatsAppShare
             post={savedPost}
             blockWhenDraft
@@ -637,8 +737,13 @@ export default function PostEditor({ postId = null, initial = null }) {
         <div hidden={tab !== "preview"}>
           <div className="t-section">
             <h3 className="t-section-title">Live Preview</h3>
-            <p className="admin-field-hint">This is how the post will render on the public website (same sanitized HTML).</p>
-            <div className="t-preview" dangerouslySetInnerHTML={{ __html: previewHtml || "<p>No content yet.</p>" }} />
+            <p className="admin-field-hint">
+              Preview of the unpublished post — title, featured image, short description, eligibility, age relaxation,
+              important dates, application link, tags and SEO metadata. Nothing is saved until you publish.
+            </p>
+            <div className="pv-page">
+              <JobPreview post={previewPost} />
+            </div>
           </div>
         </div>
       </div>
