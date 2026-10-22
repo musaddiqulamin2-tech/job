@@ -1,34 +1,35 @@
-// Builds the recruitment post that an admin shares to the official JobCareer
-// WhatsApp Channel.
+// Builds the recruitment post that an admin shares from the official JobCareer
+// Canvas WhatsApp Channel.
 //
-// This module only PREPARES a post. It never contacts WhatsApp, holds no Meta
-// credentials and stores nothing. Publishing straight into a Channel needs an
-// approved Meta WhatsApp Business integration plus a linked Channel, which this
-// site does not use, so the admin copies or forwards the generated text
-// themselves. Nothing here should ever claim a post reached the Channel.
+// The generated text contains only the job information that exists in the
+// database plus the job's own page on this website. It never includes external
+// application links, third-party job sites, notification PDFs or a channel
+// invitation link.
+//
+// This module only PREPARES the text. Nothing is published to WhatsApp
+// automatically — the admin copies the message or hands it to WhatsApp, and
+// posts it to the Channel manually.
 
+// Kept for the admin UI convenience link only. It is never inserted into the
+// generated post itself.
 export const WHATSAPP_CHANNEL_URL =
   "https://whatsapp.com/channel/0029VbE0rPK84Om7jfUDyi47";
 
-export const SITE_BASE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL || "https://jobcareercanvas.in"
-).replace(/\/+$/, "");
+// The WhatsApp post must link to a public job page on this domain only.
+export const SITE_BASE_URL = "https://jobcareercanvas.in";
+
+export const SITE_NAME = "JobCareer Canvas";
 
 // Placeholders an admin might type instead of leaving a field blank. They are
-// treated as empty so the channel post never ships a dead "N/A" line.
+// treated as empty so the post never ships a dead "N/A" line.
 const BLANK_VALUES = new Set([
   "", "-", "--", "---", "n/a", "na", "nil", "none", "null", "undefined",
   "tba", "tbd", "to be announced", "coming soon", "not available",
   "not specified", "not mentioned",
 ]);
 
-const SECTION_RULE = "━━━━━━━━━━━━━━━━━━";
-
-// Recruitment channels stay readable when long paragraphs are capped and the
-// reader is pointed at the full-details link instead.
-const MAX_DETAIL_CHARS = 240;
-const MAX_STEP_CHARS = 180;
-const MAX_STEPS = 8;
+const MAX_SUMMARY_CHARS = 320;
+const MAX_DETAIL_CHARS = 200;
 
 function blankish(value) {
   const text = String(value).trim().toLowerCase();
@@ -54,11 +55,28 @@ export function cleanList(value) {
     .filter((entry) => entry && !blankish(entry));
 }
 
-// Admin-created posts are published under /post/[slug]. Legacy submissions use
-// /job/[id], so only a slug is ever used to build a public link.
+/**
+ * Removes URLs, "www." addresses and bare domains. The only link in the final
+ * post is the job page added separately, so admin-written fields can never leak
+ * a third-party application, notification or channel link.
+ */
+function stripLinks(value) {
+  return String(value ?? "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/\bwww\.\S+/gi, "")
+    .replace(/\b[a-z0-9-]+\.(?:com|in|org|net|gov|co|io|info|edu|nic|me|app|site|online)(?:\/\S*)?/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+/**
+ * Public URL for a job post. Admin-created jobs live at /post/[slug] (see
+ * frontend/src/app/(site)/post/[slug]/page.jsx). When a post has no slug yet,
+ * no link is returned — a placeholder or homepage link is never shown.
+ */
 export function jobPublicUrl(post) {
   const slug = clean(post?.slug).replace(/^\/+/, "");
-  return slug ? `${SITE_BASE_URL}/post/${slug}` : SITE_BASE_URL;
+  return slug ? `${SITE_BASE_URL}/post/${slug}` : "";
 }
 
 /** Job type is derived from the post category, never hardcoded per post. */
@@ -83,72 +101,108 @@ function shorten(text, max) {
   return `${(lastSpace > max * 0.6 ? clipped.slice(0, lastSpace) : clipped).trimEnd()}…`;
 }
 
-function detailLine(emoji, label, value) {
-  const text = clean(value);
-  return text ? `${emoji} *${label}:* ${shorten(text, MAX_DETAIL_CHARS)}` : "";
+/** Year is taken from real post dates, never invented. */
+function deriveYear(post) {
+  const candidates = [
+    post.lastDate,
+    post.startDate,
+    post.examDate,
+    post.resultDate,
+    post.publishedAt,
+    post.scheduledAt,
+    post.createdAt,
+  ];
+  for (const value of candidates) {
+    if (!clean(value)) continue;
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return String(date.getFullYear());
+  }
+  return "";
 }
 
-function publishYear(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : String(date.getFullYear());
-}
-
-function buildHashtags(post) {
-  const tags = ["#JobCareer"];
-  const where = `${clean(post.title)} ${clean(post.organization)} ${clean(post.location)}`;
-  if (/assam/i.test(where)) tags.push("#AssamJobs");
-  if (post.category === "government-job") tags.push("#GovernmentJobs");
-  else if (post.category === "private-job") tags.push("#PrivateJobs");
-  const fromTitle = clean(post.title).match(/\b(20\d{2})\b/);
-  const year = fromTitle ? fromTitle[1] : publishYear(post.publishedAt);
-  if (year) tags.push(`#Recruitment${year}`);
-  return tags.join(" ");
+/** "Job Title – Year". The year is only added when the title has none. */
+export function jobHeading(post) {
+  const title = stripLinks(clean(post?.title)) || "Job Notification";
+  if (/\b(19|20)\d{2}\b/.test(title)) return title;
+  const year = deriveYear(post);
+  return year ? `${title} – ${year}` : title;
 }
 
 /**
- * Generates the channel post text from the real post record. Every line is
+ * Short, professional description built from the saved fields: the admin's own
+ * summary when present, otherwise a sentence assembled from real job data.
+ */
+export function jobDescription(post) {
+  const summary = stripLinks(clean(post?.summary));
+  if (summary) return shorten(summary, MAX_SUMMARY_CHARS);
+
+  const organization = stripLinks(clean(post?.organization));
+  const location = stripLinks(clean(post?.location));
+  const vacancies = clean(post?.vacancyCount);
+  const qualification = stripLinks(clean(post?.qualification || post?.eligibility));
+  const lastDate = clean(post?.lastDate);
+
+  const sentences = [];
+  if (organization && vacancies) {
+    sentences.push(`${organization} has announced ${vacancies} vacancies${location ? ` in ${location}` : ""}.`);
+  } else if (vacancies) {
+    sentences.push(`${vacancies} vacancies are available${location ? ` in ${location}` : ""}.`);
+  } else if (organization) {
+    sentences.push(`${organization} has released a new job notification${location ? ` for ${location}` : ""}.`);
+  }
+  if (qualification) {
+    sentences.push(`Candidates with ${shorten(qualification, 120)} qualification are eligible to apply.`);
+  }
+  if (lastDate) {
+    sentences.push(`The last date to apply is ${lastDate}.`);
+  }
+  return sentences.join(" ");
+}
+
+function detailLine(emoji, label, value) {
+  const text = stripLinks(clean(value));
+  return text ? `${emoji} *${label}:* ${shorten(text, MAX_DETAIL_CHARS)}` : "";
+}
+
+/**
+ * Generates the channel post from the real post record. Every line is
  * conditional, so fields the admin left blank are omitted instead of printing
- * undefined, null or N/A.
+ * undefined, null or N/A, and the only link in the message is the job's own
+ * page on jobcareercanvas.in.
  */
 export function generateJobWhatsAppMessage(post) {
   if (!post || typeof post !== "object") return "";
 
+  const heading = jobHeading(post);
   const url = jobPublicUrl(post);
-  const jobType = jobTypeLabel(post.category);
-  const selection = cleanList(post.selectionProcess).slice(0, MAX_STEPS);
-  const blocks = [];
-
-  blocks.push(clean(post.title) ? `🚨 *${clean(post.title)}*` : "🚨 *Job Notification*");
 
   const details = [
     detailLine("🏢", "Organization", post.organization),
-    detailLine("📌", "Post Name", post.postName),
+    detailLine("👥", "Total Vacancies", post.vacancyCount),
     detailLine("📍", "Location", post.location),
     detailLine("🎓", "Qualification", post.qualification || post.eligibility),
-    detailLine("💼", "Job Type", jobType),
-    detailLine("💰", "Salary", post.salary),
-    detailLine("👤", "Total Vacancies", post.vacancyCount),
-    detailLine("💳", "Application Fee", post.applicationFee),
+    detailLine("💼", "Job Type", jobTypeLabel(post.category)),
     detailLine("🎂", "Age Limit", post.ageLimit),
-    detailLine("📅", "Application Start", post.startDate),
+    detailLine("💳", "Application Fee", post.applicationFee),
     detailLine("⏰", "Last Date", post.lastDate),
   ].filter(Boolean);
-  if (details.length) blocks.push(details.join("\n"));
 
-  if (selection.length) {
-    blocks.push(["📝 *Selection Process:*", ...selection.map((step) => `• ${shorten(step, MAX_STEP_CHARS)}`)].join("\n"));
+  const blocks = [`🚨 *${heading}*`];
+
+  const description = jobDescription(post);
+  if (description) blocks.push(description);
+
+  if (details.length) {
+    blocks.push(`*${heading} – Important Details*\n\n${details.join("\n")}`);
   }
-  if (clean(post.applicationUrl)) blocks.push(`🔗 *Apply Online:* ${clean(post.applicationUrl)}`);
 
-  blocks.push(`📄 *Full Notification & Details:*\n${url}`);
-  blocks.push(SECTION_RULE);
-  blocks.push(`👉 *Check Complete Details & Apply:*\n${url}`);
-  blocks.push(`📲 *Follow JobCareer on WhatsApp Channel:*\n${WHATSAPP_CHANNEL_URL}`);
-  blocks.push(SECTION_RULE);
-  blocks.push(buildHashtags(post));
+  if (url) {
+    blocks.push(`🔗 ${url}`);
+  }
 
-  return blocks.filter(Boolean).join("\n\n");
+  blocks.push(`Follow ${SITE_NAME} for the latest job updates.`);
+
+  return blocks.join("\n\n");
 }
 
 /**

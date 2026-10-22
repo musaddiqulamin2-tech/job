@@ -205,7 +205,7 @@ export default function PostsPage() {
                             <div className="t-row-actions">
                               <Link href={`/admin/posts/${p._id}`} className="admin-btn admin-btn-sm">Edit</Link>
                               <a href={`/post/${p.slug}`} target="_blank" rel="noreferrer" className="admin-btn admin-btn-sm">View</a>
-                              <WhatsAppShare post={p} blockWhenDraft />
+                              <WhatsAppShare post={p} warnWhenDraft label="WhatsApp Post" />
                               <button
                                 type="button"
                                 className="admin-btn admin-btn-sm admin-btn-danger"

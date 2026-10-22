@@ -12855,6 +12855,7 @@ a.admin-position-row {
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  overflow-y: auto;
 }
 
 .wa-share-head {
@@ -12899,6 +12900,72 @@ a.admin-position-row {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.wa-share-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wa-share-count {
+  margin-left: auto;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.wa-share-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.wa-share-bubble {
+  max-height: 260px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 10px 10px 10px 2px;
+  background: #dcf8c6;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.wa-share-bubble-text {
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wa-share-bubble-text strong {
+  font-weight: 700;
+}
+
+.wa-share-editor {
+  width: 100%;
+  min-height: 240px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.wa-share-editor:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: #fff;
 }
 
 .wa-share-note {

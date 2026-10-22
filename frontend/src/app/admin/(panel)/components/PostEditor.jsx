@@ -468,9 +468,9 @@ export default function PostEditor({ postId = null, initial = null }) {
           )}
           <WhatsAppShare
             post={savedPost}
-            blockWhenDraft
+            warnWhenDraft
             className="admin-btn"
-            label="Share on WhatsApp Channel"
+            label="Generate WhatsApp Post"
           />
         </div>
       </div>

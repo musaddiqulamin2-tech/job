@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toast } from "./AdminUI";
-import {
-  WHATSAPP_CHANNEL_URL,
-  generateJobWhatsAppMessage,
-  whatsAppShareUrl,
-} from "../../../lib/whatsappPost";
+import { generateJobWhatsAppMessage, whatsAppShareUrl } from "../../../lib/whatsappPost";
 
-const COPY_OK = "WhatsApp post copied successfully.";
-const SHARE_OK = "WhatsApp post prepared successfully.";
+const COPY_OK = "WhatsApp message copied successfully.";
+const SHARE_OK = "Opening WhatsApp with the generated message…";
+const REGENERATED = "Message regenerated from the saved job details.";
 
 async function copyToClipboard(text) {
   try {
@@ -36,24 +33,42 @@ async function copyToClipboard(text) {
   }
 }
 
+// WhatsApp renders *bold* text. The preview mirrors that so the admin sees the
+// post roughly the way it will appear in the channel.
+function renderWhatsAppText(text) {
+  return String(text)
+    .split(/(\*[^*\n]+\*)/g)
+    .map((part, index) =>
+      part.length > 2 && part.startsWith("*") && part.endsWith("*") ? (
+        <strong key={index}>{part.slice(1, -1)}</strong>
+      ) : (
+        <span key={index}>{part}</span>
+      )
+    );
+}
+
 /**
- * "Share on WhatsApp Channel" for one post. Opens a preview of the generated
- * recruitment post, then lets the admin copy it or hand it to WhatsApp. It does
- * not post to the Channel and never claims to have done so.
+ * WhatsApp job-post generator for one post. The generated message is editable,
+ * can be previewed, copied and handed to WhatsApp. It only prepares the text —
+ * it never posts to the Channel automatically.
  */
 export default function WhatsAppShare({
   post,
-  label = "Share on WhatsApp Channel",
+  label = "Generate WhatsApp Post",
   className = "admin-btn admin-btn-sm",
+  warnWhenDraft = false,
+  // Legacy prop kept so any older caller keeps working.
   blockWhenDraft = false,
 }) {
   const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [showPreview, setShowPreview] = useState(true);
   const [toast, setToast] = useState(null);
   const closeRef = useRef(null);
 
-  const message = useMemo(() => (post ? generateJobWhatsAppMessage(post) : ""), [post]);
-  const status = post?.status;
-  const hidden = !post || !message || (blockWhenDraft && status !== "published");
+  const generated = post ? generateJobWhatsAppMessage(post) : "";
+  const unavailable = !post || !generated;
+  const draftWarning = (warnWhenDraft || blockWhenDraft) && post && post.status !== "published";
 
   useEffect(() => {
     if (!open) return undefined;
@@ -70,26 +85,42 @@ export default function WhatsAppShare({
     };
   }, [open]);
 
-  if (hidden) return null;
+  if (unavailable) return null;
 
   function notify(type, text) {
     setToast({ type, message: text });
     window.setTimeout(() => setToast(null), 3500);
   }
 
+  function openEditor() {
+    setMessage(generated);
+    setShowPreview(true);
+    setOpen(true);
+  }
+
+  function regenerate() {
+    setMessage(generateJobWhatsAppMessage(post));
+    notify("success", REGENERATED);
+  }
+
   async function copy() {
+    const text = message.trim();
+    if (!text) {
+      notify("error", "The message is empty. Generate the post first.");
+      return;
+    }
     const copied = await copyToClipboard(message);
     notify(
       copied ? "success" : "error",
       copied
         ? COPY_OK
-        : "Could not copy automatically. Please select the preview text and copy it manually."
+        : "Could not copy automatically. Select the message text and copy it manually."
     );
   }
 
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <button type="button" className={className} onClick={openEditor}>
         🟢 {label}
       </button>
 
@@ -108,8 +139,8 @@ export default function WhatsAppShare({
           <div className="wa-share-modal">
             <div className="wa-share-head">
               <div className="wa-share-heading">
-                <h2 id="wa-share-title">WhatsApp Post Preview</h2>
-                <p>Review the prepared post, then copy it or open WhatsApp to send it to the channel.</p>
+                <h2 id="wa-share-title">WhatsApp Job Post</h2>
+                <p>Edit the message, preview it, then copy it or open WhatsApp to post it to your channel.</p>
               </div>
               <button
                 ref={closeRef}
@@ -121,11 +152,44 @@ export default function WhatsAppShare({
               </button>
             </div>
 
-            <pre className="wa-share-preview">{message}</pre>
+            {draftWarning && (
+              <p className="wa-share-warning">
+                This post is not published yet. The job-details link will work only after you publish
+                it.
+              </p>
+            )}
+
+            <div className="wa-share-toolbar">
+              <button type="button" className="admin-btn admin-btn-sm" onClick={regenerate}>
+                Generate WhatsApp Post
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn-sm"
+                onClick={() => setShowPreview((value) => !value)}
+              >
+                {showPreview ? "Hide Preview" : "Preview Post"}
+              </button>
+              <span className="wa-share-count">{message.length} characters</span>
+            </div>
+
+            {showPreview && (
+              <div className="wa-share-bubble" aria-label="WhatsApp preview">
+                <div className="wa-share-bubble-text">{renderWhatsAppText(message)}</div>
+              </div>
+            )}
+
+            <textarea
+              className="wa-share-editor"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              spellCheck={false}
+              aria-label="Editable WhatsApp message"
+            />
 
             <div className="wa-share-actions">
               <button type="button" className="admin-btn admin-btn-primary" onClick={copy}>
-                📋 Copy WhatsApp Post
+                📋 Copy Message
               </button>
               <a
                 className="admin-btn"
@@ -136,19 +200,11 @@ export default function WhatsAppShare({
               >
                 🟢 Share on WhatsApp
               </a>
-              <a
-                className="admin-btn"
-                href={WHATSAPP_CHANNEL_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                📲 Open Channel
-              </a>
             </div>
 
             <p className="wa-share-note">
-              This only prepares the post. Nothing is published to the channel automatically — send it
-              from the official JobCareer WhatsApp Channel yourself.
+              This only prepares the message. Opening WhatsApp does not publish to your Channel
+              automatically — copy the message and paste it into the Channel to post it.
             </p>
           </div>
         </div>
