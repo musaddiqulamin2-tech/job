@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { getAdmissionPosts, getSampleJobs, getSampleResults } from "../../lib/categoryData";
 import AdmissionSidebar from "../../Components/admission/AdmissionSidebar";
 import AdmissionCategoryFilter from "../../Components/admission/AdmissionCategoryFilter";
 
@@ -21,9 +20,9 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdmissionLandingPage() {
-  const posts = getAdmissionPosts();
-  const jobs = getSampleJobs();
-  const results = getSampleResults();
+  const posts = [];
+  const jobs = [];
+  const results = [];
 
   return (
     <main className="jh-detail-page ad-detail-page">
